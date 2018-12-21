@@ -70,8 +70,7 @@ class ppo_discrete:
         states, actions, advantages, target_values, old_probabilities, n_samples \
                     = self.trainsamples_from_trajectories(self.trajectories)
         print("-------")
-        print("training on {} samples...".format(n_samples))
-        print("-------")
+        print("training on {} samples".format(n_samples), end='',flush=True)
         for i in range(self.settings["n_train_epochs"]):
             pi = np.random.permutation(np.arange(n_samples))
             for x in range(0,n_samples,self.settings["minibatch_size"]):
@@ -82,6 +81,8 @@ class ppo_discrete:
                                     target_values[pi[x:x+self.settings["minibatch_size"]]],
                                     old_probabilities[pi[x:x+self.settings["minibatch_size"]]]
                                 )
+            print(".",end='',flush=True)
+        print("-------")
         if self.n_saves % self.settings["save_period"] == 0:
             self.model.save(self.n_saves)
             self.n_saves += 1
