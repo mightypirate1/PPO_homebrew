@@ -26,7 +26,7 @@ class ppo_discrete:
         for x in settings: self.settings[x] = settings[x]
         self.state_size = state_size
         self.action_size = action_size
-        pixels = len(self.state_size) == 3 #Assume pixels!
+        self.pixels = len(self.state_size) == 3 #Assume pixels!
         self.model = ppo_discrete_model(
                                         self.settings["name"],
                                         self.state_size,
@@ -34,7 +34,7 @@ class ppo_discrete:
                                         session,
                                         lr=self.settings["learning_rate"],
                                         epsilon=self.settings["epsilon"],
-                                        pixels=pixels,
+                                        pixels=self.pixels,
                                         loss_weights=(
                                                         self.settings["weight_loss_policy"],
                                                         self.settings["weight_loss_entropy"],
@@ -47,7 +47,7 @@ class ppo_discrete:
         self.n_saves = 0
 
     def get_action(self, s):
-        p, v = self.model.evaluate([s])
+        p, v = self.model.evaluate([s], pixels=self.pixels)
         a = np.random.choice(np.arange(self.action_size), p=p[0])
         assert not np.isinf(v[0]) and not np.isnan(v[0]), v[0]
         assert not np.any(np.isinf(p[0])) and not np.any(np.isnan(p[0])), p[0]
@@ -79,7 +79,8 @@ class ppo_discrete:
                                     actions[pi[x:x+self.settings["minibatch_size"]]],
                                     advantages[pi[x:x+self.settings["minibatch_size"]]],
                                     target_values[pi[x:x+self.settings["minibatch_size"]]],
-                                    old_probabilities[pi[x:x+self.settings["minibatch_size"]]]
+                                    old_probabilities[pi[x:x+self.settings["minibatch_size"]]],
+                                    pixels=self.pixels
                                 )
             print(".",end='',flush=True)
         print("-------")
