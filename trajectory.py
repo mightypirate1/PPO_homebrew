@@ -21,7 +21,7 @@ class trajectory:
         advantages     = [0 for x in range(self.length)]
         td_errors      = [0 for x in range(self.length)]
         target_values  = [0 for x in range(self.length)]
-        p,v = model(self.s, actions=self.a)
+        p,v = model(self.s)
         for i in range(self.length):
             td_errors[i] = -v[i] + self.r[i] + gamma_discount*v[i+1]*int(not self.d[i])
         for i in range(self.length):
