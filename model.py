@@ -1,6 +1,17 @@
 import tensorflow as tf
 import numpy as np
 
+settings = {
+            "dense_n_hidden"     : 6,
+            "dense_hidden_size"  : 40,
+
+            "conv_n_convs"       : 3,
+            "conv_n_channels"    : 32,
+            "conv_filter_size"   : (5,5),
+            "conv_n_dense"       : 3,
+            "conv_dense_size"    : 1024,
+            }
+
 class ppo_discrete_model:
     def __init__(self, name, state_size, action_size, session, epsilon=0.8, lr=0.0001, loss_weights=(1.0,0.001,1.0), pixels=False):
         self.session = session
@@ -53,9 +64,10 @@ class ppo_discrete_model:
         self.session.run(run_list, feed_dict=feed_dict)
 
     def create_training_ops(self,actions_tf, probabilities_tf, old_probabilities_tf, advantages_tf, values_tf, target_values_tf, lr=None, epsilon=None):
+        e = 10**-7
         entropy_tf = tf.reduce_sum(-tf.multiply(probabilities_tf, tf.log(probabilities_tf)), axis=1)
         action_prob_tf = tf.reduce_sum(tf.multiply(actions_tf, probabilities_tf), axis=1, keep_dims=True)
-        ratio_tf = tf.div(action_prob_tf, old_probabilities_tf)
+        ratio_tf = tf.div( action_prob_tf + e   ,   old_probabilities_tf + e )
         ratio_clipped_tf = tf.clip_by_value(ratio_tf, 1-epsilon, 1+epsilon)
         loss_clip_tf = tf.reduce_mean(tf.minimum( tf.multiply(ratio_tf,advantages_tf), tf.multiply(ratio_clipped_tf,advantages_tf) ) )
         loss_entropy_tf = tf.reduce_mean(entropy_tf)
@@ -84,32 +96,31 @@ class ppo_discrete_model:
             return ret
     def create_dense(self, input_tensor):
         x = input_tensor
-        for n in range(6):
+        for n in range(settings["dense_n_hidden"]):
             x = tf.layers.dense(
                                 x,
-                                40,
+                                settings["dense_hidden_size"],
                                 activation=tf.nn.elu,
                                 )
         return x
     def create_conv(self, input_tensor):
-        print(input_tensor)
         x = tf.layers.average_pooling2d(input_tensor, 2, 2, padding='same')
         x = tf.reduce_mean(x, axis=3, keepdims=True)
-        for n in range(3):
+        for n in range(settings["conv_n_convs"]):
             x = tf.layers.conv2d(
                                 x,
-                                32//2**n,
-                                (5, 5),
+                                settings["conv_n_channels"],
+                                settings["conv_filter_size"],
                                 padding='same',
                                 activation=tf.nn.elu,
                                 kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(),
                                 )
         x = tf.layers.average_pooling2d(x, 4, 4, padding='same')
         x = tf.layers.flatten(x)
-        for n in range(2):
+        for n in range(settings["conv_n_dense"]):
             x = tf.layers.dense(
                                 x,
-                                256,
+                                settings["conv_dense_size"],
                                 activation=tf.nn.elu
                                 )
         return x

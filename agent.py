@@ -5,30 +5,30 @@ from model import ppo_discrete_model
 from trajectory import trajectory
 
 default_settings = {
-                    "name" : "breakout",
-                    "minibatch_size" : 64,
+                    "minibatch_size" : 128,
                     "n_train_epochs" : 10,
                     "learning_rate" : 10**-4,
                     "epsilon" : 0.2,
                     "weight_loss_policy" : 1.0,
-                    "weight_loss_entropy" : 0.0001,
-                    "weight_loss_value" : 1.05,
-                    "steps_before_training" : 1024,
+                    "weight_loss_entropy" : 0.01,
+                    "weight_loss_value" : 1.00,
+                    "steps_before_training" : 8192,
                     "trajectory_length" : 32,
                     "gamma" : 0.99,
-                    "lambda" : 0.99,
+                    "lambda" : 0.95,
                     "save_period" : 10,
                     }
 
 class ppo_discrete:
-    def __init__(self, session, state_size, action_size, trajectory_length=50, steps_before_update=1000, settings={}):
+    def __init__(self, name, session, state_size, action_size, trajectory_length=50, steps_before_update=1000, settings={}):
+        self.name = name
         self.settings = default_settings.copy()
         for x in settings: self.settings[x] = settings[x]
         self.state_size = state_size
         self.action_size = action_size
         self.pixels = len(self.state_size) == 3 #Assume pixels!
         self.model = ppo_discrete_model(
-                                        self.settings["name"],
+                                        self.name,
                                         self.state_size,
                                         self.action_size,
                                         session,
@@ -44,6 +44,7 @@ class ppo_discrete:
         self.current_trajectory = trajectory(self.state_size, self.action_size)
         self.trajectories = []
         self.internal_t = 0
+        self.n_trainings = 0
         self.n_saves = 0
 
     def get_action(self, s):
@@ -55,11 +56,10 @@ class ppo_discrete:
 
     def remember(self,e):
         s,a,r,s_p,d = e
-        if e[1] is not None:
-            self.internal_t += 1
+        self.internal_t += 1
         self.current_trajectory.add((s,a,r,d))
-        if self.current_trajectory.get_length() == self.settings["trajectory_length"] or e[4]:
-            self.current_trajectory.add((s_p,None,None,d))
+        if self.current_trajectory.get_length() >= self.settings["trajectory_length"] or e[4]:
+            self.current_trajectory.add((s_p,None,None,d), end_of_trajectory=True) #This is the system used to get an s' in for the last state too!
             self.trajectories.append(self.current_trajectory)
             self.current_trajectory = trajectory(self.state_size, self.action_size)
         if self.internal_t % self.settings["steps_before_training"] == 0:
@@ -83,10 +83,12 @@ class ppo_discrete:
                                     pixels=self.pixels
                                 )
             print(".",end='',flush=True)
-        print("-------")
-        if self.n_saves % self.settings["save_period"] == 0:
+        print("\n")
+        if self.n_trainings % self.settings["save_period"] == 0:
             self.model.save(self.n_saves)
             self.n_saves += 1
+        self.n_trainings += 1
+        print("-------")
 
     def trainsamples_from_trajectories(self, trajectories):
         states, actions, advantages, target_values, old_probabilities, n_samples = [], [], [], [], [], 0

@@ -6,10 +6,10 @@ class trajectory:
         self.s, self.a, self.a_1hot, self.r, self.d = [], [], [], [], []
     def get_states(self):
         return [self.s[i] for i,a in enumerate(self.a) if a is not None]
-    def add(self,e):
+    def add(self,e, end_of_trajectory=False):
         s,a,r,d = e
         self.s.append(s)
-        if a is not None:
+        if not end_of_trajectory:
             self.a.append(a)
             self.a_1hot.append([int(x == a) for x in range(self.action_size)]) #1-hot encoding of the action
             self.r.append(r)
