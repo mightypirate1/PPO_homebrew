@@ -64,15 +64,21 @@ class ppo_discrete_model:
         self.session.run(run_list, feed_dict=feed_dict)
 
     def create_training_ops(self,actions_tf, probabilities_tf, old_probabilities_tf, advantages_tf, values_tf, target_values_tf, lr=None, epsilon=None):
+        #Fudge it up so it doesnt inf/nan...
         e = 10**-7
-        entropy_tf = tf.reduce_sum(-tf.multiply(probabilities_tf, tf.log(probabilities_tf)), axis=1)
-        action_prob_tf = tf.reduce_sum(tf.multiply(actions_tf, probabilities_tf), axis=1, keep_dims=True)
-        ratio_tf = tf.div( action_prob_tf + e   ,   old_probabilities_tf + e )
+        probs = tf.maximum(probabilities_tf, e)
+        old_probs = tf.maximum(old_probabilities_tf, e)
+        #Define some intermediate tensors...
+        entropy_tf = tf.reduce_sum(-tf.multiply(probs, tf.log(probs)), axis=1)
+        action_prob_tf = tf.reduce_sum(tf.multiply(actions_tf, probs), axis=1, keep_dims=True)
+        ratio_tf = tf.div( action_prob_tf , old_probs )
         ratio_clipped_tf = tf.clip_by_value(ratio_tf, 1-epsilon, 1+epsilon)
+        #Define the loss tensors!
         loss_clip_tf = tf.reduce_mean(tf.minimum( tf.multiply(ratio_tf,advantages_tf), tf.multiply(ratio_clipped_tf,advantages_tf) ) )
         loss_entropy_tf = tf.reduce_mean(entropy_tf)
         loss_value_tf = tf.losses.mean_squared_error(values_tf, target_values_tf)
         loss_tf = -self.weight_loss_policy * loss_clip_tf - self.weight_loss_entropy * loss_entropy_tf + self.weight_loss_value * loss_value_tf
+        #Minimize loss!
         return tf.train.AdamOptimizer(learning_rate=lr).minimize(loss_tf)
 
     def create_net(self, name=None, input=None, output_size=None, output_activation=tf.nn.elu, add_value_head=False, pixels=False):
