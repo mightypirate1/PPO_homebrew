@@ -120,5 +120,5 @@ class ppo_discrete_model:
     def restore(self, savepoint):
         # self.saver.restore(self.session, "saved/"+self.name+"/")
         self.saver.restore(self.session, "saved/"+savepoint)
-    def __call__(self,x, actions=None):
-        return self.evaluate(x, actions=actions)
+    def __call__(self,x):
+        return self.evaluate(x)
