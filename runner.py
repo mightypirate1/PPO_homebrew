@@ -26,19 +26,20 @@ with tf.Session() as session:
     if arguments["--load"] is not None:
         agent.restore(arguments["--load"])
     #Init variables...
-    s_prime, n_episodes, t0, R = env.reset(), 0, -1, 0
+    s_prime, n_episodes, round_score,t0, R = env.reset(), 0, 0, -1, 0
     for t in range(int(arguments["--steps"])):
         s = s_prime
         a = agent.get_action(s)
         if arguments["--test"]:
             env.render()
         s_prime, r, done, _ = env.step(a)
+        round_score += r
         if arguments["--train"]:
             agent.remember((s,a,r,s_prime,done))
         if done:
             n_episodes += 1
             alpha = 0.03
-            R = (1-alpha)*R + alpha*(t-t0)
+            R = (1-alpha)*R + alpha*round_score
             w = alpha*( 1-(1-alpha)**(n_episodes) )/(alpha)
-            print("Episode length: {}, score: {}".format(t-t0, R/w))
-            s_prime, t0 = env.reset(), t
+            print("Episode length: {}, score: {} (ExpAvg: {})".format(t-t0, round_score, R/w))
+            s_prime, round_score, t0 = env.reset(), 0, t
