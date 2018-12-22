@@ -6,8 +6,8 @@ import tensorflow as tf
 
 docoptstring = '''PPO_homebrew!
 Usage:
-  runner.py (--wtrain | --test | --help) [options]
-  runner.py (--wtrain | --test | --help) [options] --x (<opt> <setting>)...
+  runner.py (--train | --test | --help) [options]
+  runner.py (--train | --test | --help) [options] --x (<opt> <setting>)...
 
 Options:
     --train        Train agent.
