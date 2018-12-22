@@ -79,7 +79,7 @@ class ppo_discrete_model:
         loss_value_tf = tf.losses.mean_squared_error(values_tf, target_values_tf)
         loss_tf = -self.weight_loss_policy * loss_clip_tf - self.weight_loss_entropy * loss_entropy_tf + self.weight_loss_value * loss_value_tf
         #Minimize loss!
-        return tf.train.AdamOptimizer(lr=lr).minimize(loss_tf)
+        return tf.train.AdamOptimizer(learning_rate=lr).minimize(loss_tf)
 
     def create_net(self, name=None, input=None, output_size=None, output_activation=tf.nn.elu, add_value_head=False, pixels=False):
         with tf.variable_scope(name):
