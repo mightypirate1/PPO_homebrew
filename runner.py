@@ -1,11 +1,13 @@
 import gym
 import docopt
 from agent import ppo_discrete
+import aux
 import tensorflow as tf
 
 docoptstring = '''PPO_homebrew!
 Usage:
-  runner.py (--train | --test | --help) [options]
+  runner.py (--wtrain | --test | --help) [options]
+  runner.py (--wtrain | --test | --help) [options] --x (<opt> <setting>)...
 
 Options:
     --train        Train agent.
@@ -16,25 +18,28 @@ Options:
     --name N       Name the agent N. [default: ape]
     --verbose      More print statements!
     --help         Print this message.
-'''
-arguments = docopt.docopt(docoptstring)
 
-env = gym.make(arguments["--env"])
+Using the --x option is developer-mode.
+'''
+
+settings = docopt.docopt(docoptstring)
+agent_settings = aux.settings_dict(settings["<opt>"],settings["<setting>"])
+env = gym.make(settings["--env"])
 with tf.Session() as session:
     #Init agent!
-    agent = ppo_discrete( arguments["--name"], session, state_size=env.observation_space.shape, action_size=env.action_space.n )
-    if arguments["--load"] is not None:
-        agent.restore(arguments["--load"])
+    agent = ppo_discrete( settings["--name"], session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings )
+    if settings["--load"] is not None:
+        agent.restore(settings["--load"])
     #Init variables...
     s_prime, n_episodes, round_score,t0, R = env.reset(), 0, 0, -1, 0
-    for t in range(int(arguments["--steps"])):
+    for t in range(int(settings["--steps"])):
         s = s_prime
         a = agent.get_action(s)
-        if arguments["--test"]:
+        if settings["--test"]:
             env.render()
         s_prime, r, done, _ = env.step(a)
         round_score += r
-        if arguments["--train"]:
+        if settings["--train"]:
             agent.remember((s,a,r,s_prime,done))
         if done:
             n_episodes += 1

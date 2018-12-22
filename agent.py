@@ -7,7 +7,7 @@ from trajectory import trajectory
 default_settings = {
                     "minibatch_size" : 128,
                     "n_train_epochs" : 10,
-                    "learning_rate" : 10**-4,
+                    "lr" : 10**-4,
                     "epsilon" : 0.2,
                     "weight_loss_policy" : 1.0,
                     "weight_loss_entropy" : 0.01,
@@ -32,7 +32,7 @@ class ppo_discrete:
                                         self.state_size,
                                         self.action_size,
                                         session,
-                                        lr=self.settings["learning_rate"],
+                                        lr=self.settings["lr"],
                                         epsilon=self.settings["epsilon"],
                                         pixels=self.pixels,
                                         loss_weights=(
