@@ -1,25 +1,33 @@
 import tensorflow as tf
 import numpy as np
 
-settings = {
-            "dense_n_hidden"     : 6,
-            "dense_hidden_size"  : 40,
+default_settings = {
+                    "dense_n_hidden"      : 6,
+                    "dense_hidden_size"   : 40,
 
-            "conv_n_convs"       : 3,
-            "conv_n_channels"    : 32,
-            "conv_filter_size"   : (5,5),
-            "conv_n_dense"       : 3,
-            "conv_dense_size"    : 1024,
-            }
+                    "conv_n_convs"        : 3,
+                    "conv_n_channels"     : 32,
+                    "conv_filter_size"    : (5,5),
+                    "conv_n_dense"        : 3,
+                    "conv_dense_size"     : 1024,
+
+                    "epsilon"             : 0.2,
+                    "lr"                  : 10**-4,
+                    "weight_loss_policy"  : 1.0,
+                    "weight_loss_entropy" : 0.01,
+                    "weight_loss_value"   : 1.00,
+                    }
 
 class ppo_discrete_model:
-    def __init__(self, name, state_size, action_size, session, epsilon=0.8, lr=0.0001, loss_weights=(1.0,0.001,1.0), pixels=False):
+    def __init__(self, name, state_size, action_size, session, pixels=False, settings={}):
+        self.settings = default_settings.copy()
+        for x in settings: self.settings[x] = settings[x]
+        print("model created with settings:")
+        for x in default_settings:
+            print("\t{}\t{}".format(x.ljust(20), self.settings[x]))
+        print("---")
         self.session = session
         self.name = name
-        c1,c2,c3 = loss_weights
-        self.weight_loss_policy = c1
-        self.weight_loss_entropy = c2
-        self.weight_loss_value = c3
         with tf.variable_scope("ppo_discrete") as scope:
             self.states_tf = tf.placeholder(dtype=tf.float32, shape=(None, *state_size), name='states')
             self.actions_tf = tf.placeholder(dtype=tf.float32, shape=(None, action_size), name='actions')
@@ -28,7 +36,14 @@ class ppo_discrete_model:
             self.old_probabilities_tf = tf.placeholder(dtype=tf.float32, shape=(None, 1), name='old_probs')
             # self.probabilities_tf = self.create_net(name='policy_net', input=self.states_tf, output_size=action_size, output_activation=tf.nn.softmax)
             # self.values_tf        = self.create_net(name='value_net',  input=self.states_tf, output_size=1,           output_activation=None)
-            self.probabilities_tf, self.values_tf = self.create_net(name='policy_net', input=self.states_tf, output_activation=tf.nn.softmax, output_size=action_size, add_value_head=True, pixels=pixels)
+            self.probabilities_tf, self.values_tf = self.create_net(
+                                                                    name='policy_net',
+                                                                    input=self.states_tf,
+                                                                    output_activation=tf.nn.softmax,
+                                                                    output_size=action_size,
+                                                                    add_value_head=True,
+                                                                    pixels=pixels
+                                                                    )
             self.training_ops = self.create_training_ops(
                                                             self.actions_tf,
                                                             self.probabilities_tf,
@@ -37,8 +52,8 @@ class ppo_discrete_model:
 
                                                             self.values_tf,
                                                             self.target_values_tf,
-                                                            epsilon=epsilon,
-                                                            lr=lr,
+                                                            epsilon=self.settings["epsilon"],
+                                                            lr=self.settings["lr"],
                                                         )
             self.all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope.name)
             self.init_ops = tf.variables_initializer(self.all_variables)
@@ -77,7 +92,9 @@ class ppo_discrete_model:
         loss_clip_tf = tf.reduce_mean(tf.minimum( tf.multiply(ratio_tf,advantages_tf), tf.multiply(ratio_clipped_tf,advantages_tf) ) )
         loss_entropy_tf = tf.reduce_mean(entropy_tf)
         loss_value_tf = tf.losses.mean_squared_error(values_tf, target_values_tf)
-        loss_tf = -self.weight_loss_policy * loss_clip_tf - self.weight_loss_entropy * loss_entropy_tf + self.weight_loss_value * loss_value_tf
+        loss_tf = - self.settings["weight_loss_policy"]  * loss_clip_tf      \
+                  - self.settings["weight_loss_entropy"] * loss_entropy_tf   \
+                  + self.settings["weight_loss_value"]   * loss_value_tf
         #Minimize loss!
         return tf.train.AdamOptimizer(learning_rate=lr).minimize(loss_tf)
 
@@ -104,32 +121,35 @@ class ppo_discrete_model:
     def create_dense(self, input_tensor):
         print("model: create dense")
         x = input_tensor
-        for n in range(settings["dense_n_hidden"]):
+        for n in range(self.settings["dense_n_hidden"]):
+            print("\t",self.settings["dense_hidden_size"]," unit layer")
             x = tf.layers.dense(
                                 x,
-                                settings["dense_hidden_size"],
+                                self.settings["dense_hidden_size"],
                                 activation=tf.nn.elu,
                                 )
         return x
     def create_conv(self, input_tensor):
         print("model: create conv")
-        x = tf.layers.average_pooling2d(input_tensor, 2, 2, padding='same')
-        x = tf.reduce_mean(x, axis=3, keepdims=True)
-        for n in range(settings["conv_n_convs"]):
+        x = tf.layers.average_pooling2d(input_tensor, 2, 2, padding='same') #downsample
+        x = tf.reduce_mean(x, axis=3, keepdims=True)                        #gray (needed?)
+        for n in range(self.settings["conv_n_convs"]):
+            print("\t",self.settings["conv_n_channels"]," channel layer: ", self.settings["conv_filter_size"])
             x = tf.layers.conv2d(
                                 x,
-                                settings["conv_n_channels"],
-                                settings["conv_filter_size"],
+                                self.settings["conv_n_channels"],
+                                self.settings["conv_filter_size"],
                                 padding='same',
                                 activation=tf.nn.elu,
                                 kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(),
                                 )
-        x = tf.layers.average_pooling2d(x, 4, 4, padding='same')
+        # x = tf.layers.average_pooling2d(x, 4, 4, padding='same')
         x = tf.layers.flatten(x)
-        for n in range(settings["conv_n_dense"]):
+        for n in range(self.settings["conv_n_dense"]):
+            print("\t",self.settings["conv_dense_size"]," unit layer")
             x = tf.layers.dense(
                                 x,
-                                settings["conv_dense_size"],
+                                self.settings["conv_dense_size"],
                                 activation=tf.nn.elu
                                 )
         return x

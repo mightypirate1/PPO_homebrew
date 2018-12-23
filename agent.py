@@ -7,11 +7,6 @@ from trajectory import trajectory
 default_settings = {
                     "minibatch_size" : 128,
                     "n_train_epochs" : 10,
-                    "lr" : 10**-4,
-                    "epsilon" : 0.2,
-                    "weight_loss_policy" : 1.0,
-                    "weight_loss_entropy" : 0.01,
-                    "weight_loss_value" : 1.00,
                     "steps_before_training" : 8192,
                     "trajectory_length" : 32,
                     "gamma" : 0.99,
@@ -32,14 +27,8 @@ class ppo_discrete:
                                         self.state_size,
                                         self.action_size,
                                         session,
-                                        lr=self.settings["lr"],
-                                        epsilon=self.settings["epsilon"],
                                         pixels=self.pixels,
-                                        loss_weights=(
-                                                        self.settings["weight_loss_policy"],
-                                                        self.settings["weight_loss_entropy"],
-                                                        self.settings["weight_loss_value"]
-                                                     )
+                                        settings=self.settings
                                         )
         self.current_trajectory = trajectory(self.state_size, self.action_size)
         self.trajectories = []
