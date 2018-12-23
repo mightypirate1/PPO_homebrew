@@ -82,6 +82,7 @@ class ppo_discrete_model:
         return tf.train.AdamOptimizer(learning_rate=lr).minimize(loss_tf)
 
     def create_net(self, name=None, input=None, output_size=None, output_activation=tf.nn.elu, add_value_head=False, pixels=False):
+        print("model: create net")
         with tf.variable_scope(name):
             if not pixels:
                 hidden = self.create_dense(input)
@@ -101,6 +102,7 @@ class ppo_discrete_model:
                 return ret, val
             return ret
     def create_dense(self, input_tensor):
+        print("model: create dense")
         x = input_tensor
         for n in range(settings["dense_n_hidden"]):
             x = tf.layers.dense(
@@ -110,6 +112,7 @@ class ppo_discrete_model:
                                 )
         return x
     def create_conv(self, input_tensor):
+        print("model: create conv")
         x = tf.layers.average_pooling2d(input_tensor, 2, 2, padding='same')
         x = tf.reduce_mean(x, axis=3, keepdims=True)
         for n in range(settings["conv_n_convs"]):
