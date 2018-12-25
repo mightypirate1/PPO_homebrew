@@ -2,6 +2,7 @@ import gym
 import docopt
 from agent import ppo_discrete
 import aux
+import wrappers
 import tensorflow as tf
 
 docoptstring = '''PPO_homebrew!
@@ -16,6 +17,7 @@ Options:
     --steps S      Run S environment steps. [default: 1000000]
     --load AGENT   Load AGENT.
     --name N       Name the agent N. [default: ape]
+    --atari        Applies a set of wrappers for Atari-environments.
     --verbose      More print statements!
     --help         Print this message.
 
@@ -25,6 +27,9 @@ Using the --x option is developer-mode.
 settings = docopt.docopt(docoptstring)
 agent_settings = aux.settings_dict(settings["<opt>"],settings["<setting>"])
 env = gym.make(settings["--env"])
+if settings["--atari"]:
+    env = wrappers.wrap_atari(env)
+
 with tf.Session() as session:
     #Init agent!
     agent = ppo_discrete( settings["--name"], session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings )
