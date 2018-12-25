@@ -199,7 +199,7 @@ class FrameStack(gym.Wrapper):
         stack_shape = tuple([s*(1 if i != axis else k) for i,s in enumerate(shp)])
         self.observation_space = spaces.Box(low=0, high=255, shape=stack_shape)
 
-    def _reset(self):
+    def reset(self):
         ob = self.env.reset()
         for _ in range(self.k):
             self.frames.append(ob)
@@ -231,9 +231,9 @@ def wrap_atari(env):
     if 'FIRE' in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)
     obs_ndim = len(env.observation_space.shape)
-    env = FrameStack(env, 4, axis=(obs_ndim-1))
     if obs_ndim == 3: #Assume pixels
         """Apply a common set of wrappers for pixel-based Atari games (i.e. not the ones that work on the RAM...)."""
+        env = FrameStack(env, 4, axis=(obs_ndim-1))
         env = ProcessFrame84(env)
         env = ScaledFloatFrame(env)
     # env = ClippedRewardsWrapper(env)
