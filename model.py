@@ -3,7 +3,7 @@ import numpy as np
 
 default_settings = {
                     "dense_n_hidden"      : 6,
-                    "dense_hidden_size"   : 40,
+                    "dense_hidden_size"   : 512,
 
                     "conv_n_convs"        : 3,
                     "conv_n_channels"     : 32,
@@ -12,7 +12,7 @@ default_settings = {
                     "conv_dense_size"     : 1024,
 
                     "epsilon"             : 0.2,
-                    "lr"                  : 10**-4,
+                    "lr"                  : 1e-4,
                     "weight_loss_policy"  : 1.0,
                     "weight_loss_entropy" : 0.01,
                     "weight_loss_value"   : 1.00,
@@ -130,9 +130,8 @@ class ppo_discrete_model:
                                 )
         return x
     def create_conv(self, input_tensor):
+        x = input_tensor
         print("model: create conv")
-        x = tf.layers.average_pooling2d(input_tensor, 2, 2, padding='same') #downsample
-        x = tf.reduce_mean(x, axis=3, keepdims=True)                        #gray (needed?)
         for n in range(self.settings["conv_n_convs"]):
             print("\t",self.settings["conv_n_channels"]," channel layer: ", self.settings["conv_filter_size"])
             x = tf.layers.conv2d(
