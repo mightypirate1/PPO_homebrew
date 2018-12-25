@@ -106,10 +106,28 @@ class MaxAndSkipEnv(gym.Wrapper):
             total_reward += reward
             if done:
                 break
-
-        max_frame = np.max(np.stack(self._obs_buffer), axis=0)
-
+        max_frame = np.max(np.stack(self._obs_buffer), axis=2)
         return max_frame, total_reward, done, info
+
+class SkipEnv(gym.Wrapper):
+    def __init__(self, env=None, skip=4):
+        """Return only every `skip`-th frame"""
+        super(SkipEnv, self).__init__(env)
+        # most recent raw observations (for max pooling across time steps)
+        self._obs_buffer = deque(maxlen=2)
+        self._skip = skip
+
+    def _step(self, action):
+        total_reward = 0.0
+        done = None
+        for _ in range(self._skip):
+            obs, reward, done, info = self.env.step(action)
+            self._obs_buffer.append(obs)
+            total_reward += reward
+            if done:
+                break
+        return obs, total_reward, done, info
+
 
     def _reset(self):
         """Clear past frame buffer and init. to first obs. from inner env."""
@@ -149,23 +167,24 @@ class ClippedRewardsWrapper(gym.RewardWrapper):
 
 
 class LazyFrames(object):
-    def __init__(self, frames):
+    def __init__(self, frames, axis=2):
         """This object ensures that common frames between the observations are only stored once.
         It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay
         buffers.
         This object should only be converted to numpy array before being passed to the model.
         You'd not belive how complex the previous solution was."""
         self._frames = frames
+        self._axis = axis
 
     def __array__(self, dtype=None):
-        out = np.concatenate(self._frames, axis=0)
+        out = np.concatenate(self._frames, axis=self.axis)
         if dtype is not None:
             out = out.astype(dtype)
         return out
 
 
 class FrameStack(gym.Wrapper):
-    def __init__(self, env, k):
+    def __init__(self, env, k, axis=None):
         """Stack k last frames.
         Returns lazy array, which is much more memory efficient.
         See Also
@@ -174,9 +193,11 @@ class FrameStack(gym.Wrapper):
         """
         gym.Wrapper.__init__(self, env)
         self.k = k
+        self.axis = axis
         self.frames = deque([], maxlen=k)
         shp = env.observation_space.shape
-        self.observation_space = spaces.Box(low=0, high=255, shape=(shp[0]*k, shp[1], shp[2]))
+        stack_shape = tuple([s*(1 if i != axis else k) for i,s in enumerate(shp)])
+        self.observation_space = spaces.Box(low=0, high=255, shape=stack_shape)
 
     def _reset(self):
         ob = self.env.reset()
@@ -191,7 +212,8 @@ class FrameStack(gym.Wrapper):
 
     def _get_ob(self):
         assert len(self.frames) == self.k
-        return LazyFrames(list(self.frames))
+        # return LazyFrames(list(self.frames), axis=self.axis)
+        return np.concatenate(self.frames, axis=self.axis)
 
 
 class ScaledFloatFrame(gym.ObservationWrapper):
@@ -200,30 +222,19 @@ class ScaledFloatFrame(gym.ObservationWrapper):
         # with smaller replay buffers only.
         return np.array(obs).astype(np.float32) / 255.0
 
-
-class ImageToPyTorch(gym.ObservationWrapper):
-    """
-    Change image shape to CWH
-    """
-    def __init__(self, env):
-        super(ImageToPyTorch, self).__init__(env)
-        old_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]))
-
-    def _observation(self, observation):
-        return np.swapaxes(observation, 2, 0)
-
-
 def wrap_atari(env):
     """Apply a common set of wrappers for Atari games."""
     # assert 'NoFrameskip' in env.spec.id
     env = EpisodicLifeEnv(env)
     env = NoopResetEnv(env, noop_max=30)
-    env = MaxAndSkipEnv(env, skip=4)
+    env = SkipEnv(env, skip=4)
     if 'FIRE' in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)
-    env = ProcessFrame84(env)
-    # env = ImageToPyTorch(env)
-    env = FrameStack(env, 4)
+    obs_ndim = len(env.observation_space.shape)
+    env = FrameStack(env, 4, axis=(obs_ndim-1))
+    if obs_ndim == 3: #Assume pixels
+        """Apply a common set of wrappers for pixel-based Atari games (i.e. not the ones that work on the RAM...)."""
+        env = ProcessFrame84(env)
+        env = ScaledFloatFrame(env)
     # env = ClippedRewardsWrapper(env)
     return env
