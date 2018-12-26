@@ -15,7 +15,7 @@ default_settings = {
                     "lr"                  : 2.5e-4,
                     "weight_loss_policy"  : 1.0,
                     "weight_loss_entropy" : 0.01,
-                    "weight_loss_value"   : 0.50,
+                    "weight_loss_value"   : 1.00,
                     }
 
 class ppo_discrete_model:
