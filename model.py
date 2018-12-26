@@ -3,7 +3,7 @@ import numpy as np
 
 default_settings = {
                     "dense_n_hidden"      : 6,
-                    "dense_hidden_size"   : 512,
+                    "dense_hidden_size"   : 2048,
 
                     "conv_n_convs"        : 3,
                     "conv_n_channels"     : 32,

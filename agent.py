@@ -5,9 +5,9 @@ from model import ppo_discrete_model
 from trajectory import trajectory
 
 default_settings = {
-                    "minibatch_size" : 64,
-                    "n_train_epochs" : 10,
-                    "steps_before_training" : 2048,
+                    "minibatch_size" : 1024,
+                    "n_train_epochs" : 3,
+                    "steps_before_training" : 4096,
                     "trajectory_length" : 2048,
                     "gamma" : 0.99,
                     "lambda" : 0.95,
