@@ -11,8 +11,8 @@ default_settings = {
                     "conv_n_dense"        : 3,
                     "conv_dense_size"     : 1024,
 
-                    "epsilon"             : 0.2,
-                    "lr"                  : 1e-4,
+                    "epsilon"             : 0.1,
+                    "lr"                  : 2.5e-4,
                     "weight_loss_policy"  : 1.0,
                     "weight_loss_entropy" : 0.01,
                     "weight_loss_value"   : 0.50,
