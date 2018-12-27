@@ -34,13 +34,13 @@ if settings["--atari"]:
 
 ''' THREADED VERSION '''
 agents = []
-n_actors = 32
+n_actors = 4
 with tf.Session() as session:
     envs = [gym.make(settings["--env"]) for _ in range(n_actors)]
     model = None
     for i in range(n_actors):
         name = settings["--name"] + str(i)
-        with tf.device("/cpu:0"):
+        with tf.device("/device:GPU:0"):
             agent = ppo_discrete(
                                     name,
                                     session,
@@ -61,18 +61,26 @@ with tf.Session() as session:
                                 settings=agent_settings,
                                 threaded=True
                                 )
-    thread_runner = threaded_runner.threaded_runner(
-                                                    envs=envs,
-                                                    runners=agents,
-                                                    trainer=trainer,
-                                                    train_epochs=3,
-                                                    )
+    # thread_runner = threaded_runner.threaded_runner(
+    #                                                 envs=envs,
+    #                                                 runners=agents,
+    #                                                 trainer=trainer,
+    #                                                 train_epochs=3,
+    #                                                 steps=int(128/n_actors),
+    #                                                 )
 
     for t in range( int(4096/n_actors) ):
         print("-----iteration{}-----".format(t))
-        thread_runner.run(int(4096/n_actors))
-        thread_runner.join()
+        thread_runner = threaded_runner.threaded_runner(
+                                                        envs=envs,
+                                                        runners=agents,
+                                                        trainer=trainer,
+                                                        train_epochs=3,
+                                                        steps=int(4096/n_actors),
+                                                        )
 
+        thread_runner.run()
+        thread_runner.join()
 
 exit()
 

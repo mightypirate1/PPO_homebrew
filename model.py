@@ -26,6 +26,7 @@ class ppo_discrete_model:
         for x in default_settings:
             print("\t{}\t{}".format(x.ljust(20), self.settings[x]))
         print("---")
+        self.saved_weights = None
         self.session = session
         self.name = name
         with tf.variable_scope("ppo_discrete"+self.name) as scope:
@@ -159,6 +160,8 @@ class ppo_discrete_model:
     def set_weights(self, weights):
         feed_dict = dict(zip(self.assign_ops, weights))
         self.session.run(self.assign_ops, feed_dict=feed_dict)
+    def save_weights(self):
+        self.saved_weights = self.get_weights()
 
     def create_weight_setting_ops(self):
         assign_ops = []

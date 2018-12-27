@@ -34,3 +34,5 @@ class trajectory:
         #     target_values[i] = self.r[i] + gamma_discount * v[i+1]
         old_probabilities = [[p[i,a]] for i,a in enumerate(self.a)]
         return advantages, target_values, old_probabilities
+    def __len__(self):
+        return self.get_length()
