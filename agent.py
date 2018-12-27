@@ -23,14 +23,17 @@ class ppo_discrete:
         self.state_size = state_size
         self.action_size = action_size
         self.pixels = len(self.state_size) == 3 #Assume pixels!
-        self.model = ppo_discrete_model(
-                                        self.name,
-                                        self.state_size,
-                                        self.action_size,
-                                        session,
-                                        pixels=self.pixels,
-                                        settings=self.settings
-                                        ) if model is None else model
+        if model is None:
+            self.model = ppo_discrete_model(
+                                            self.name,
+                                            self.state_size,
+                                            self.action_size,
+                                            session,
+                                            pixels=self.pixels,
+                                            settings=self.settings
+                                            )
+        else:
+            self.model = model
         self.current_trajectory = trajectory(self.state_size, self.action_size)
         self.trajectories = []
         self.internal_t = 0

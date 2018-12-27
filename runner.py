@@ -34,14 +34,14 @@ if settings["--atari"]:
 
 ''' THREADED VERSION '''
 agents = []
-n_actors = 1
+n_actors = 32
 with tf.Session() as session:
     envs = [gym.make(settings["--env"]) for _ in range(n_actors)]
     for i in range(n_actors):
         name = settings["--name"] + str(i)
         model = None
         with tf.device("/cpu:0"):
-            agent = ppo_discrete( name, session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, model=None threaded=True )
+            agent = ppo_discrete( name, session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, model=None, threaded=True )
             agents.append( agent )
             model = agent.model
     with tf.device("/device:GPU:0"):
