@@ -1,6 +1,6 @@
 import gym
 import docopt
-from multi_agent import ppo_discrete
+from agent import ppo_discrete
 import aux
 import wrappers
 import tensorflow as tf
