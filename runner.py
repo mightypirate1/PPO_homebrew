@@ -4,6 +4,8 @@ from agent import ppo_discrete
 import aux
 import wrappers
 import tensorflow as tf
+import threaded_runner
+from time import time
 
 docoptstring = '''PPO_homebrew!
 Usage:
@@ -30,11 +32,40 @@ env = gym.make(settings["--env"])
 if settings["--atari"]:
     env = wrappers.wrap_atari(env)
 
+''' THREADED VERSION '''
+agents = []
+n_actors = 1
+with tf.Session() as session:
+    envs = [gym.make(settings["--env"]) for _ in range(n_actors)]
+    for i in range(n_actors):
+        name = settings["--name"] + str(i)
+        with tf.device("/cpu:0"):
+            agents.append( ppo_discrete( name, session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, threaded=True ) )
+    with tf.device("/device:GPU:0"):
+        trainer = ppo_discrete( settings["--name"]+"_trainer", session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, threaded=True )
+    thread_runner = threaded_runner.threaded_runner(
+                                                    envs=envs,
+                                                    runners=agents,
+                                                    trainer=trainer,
+                                                    train_epochs=3,
+                                                    )
+
+    for t in range( int(4096/n_actors) ):
+        t0 = time()
+        print("-----iteration{}-----".format(t))
+        thread_runner.run(int(4096/n_actors))
+        thread_runner.join()
+        print(time() - t0)
+
+
+exit()
+
 with tf.Session() as session:
     #Init agent!
     agent = ppo_discrete( settings["--name"], session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings )
     if settings["--load"] is not None:
         agent.restore(settings["--load"])
+
     #Init variables...
     s_prime, n_episodes, round_score,t0, R = env.reset(), 0, 0, -1, 0
     for t in range(int(settings["--steps"])):

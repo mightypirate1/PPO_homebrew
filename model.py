@@ -11,11 +11,11 @@ default_settings = {
                     "conv_n_dense"        : 3,
                     "conv_dense_size"     : 1024,
 
-                    "epsilon"             : 0.1,
-                    "lr"                  : 2.5e-4,
+                    "epsilon"             : 0.2,
+                    "lr"                  : 1e-4,
                     "weight_loss_policy"  : 1.0,
                     "weight_loss_entropy" : 0.01,
-                    "weight_loss_value"   : 1.00,
+                    "weight_loss_value"   : 0.50,
                     }
 
 class ppo_discrete_model:
@@ -28,7 +28,7 @@ class ppo_discrete_model:
         print("---")
         self.session = session
         self.name = name
-        with tf.variable_scope("ppo_discrete") as scope:
+        with tf.variable_scope("ppo_discrete"+self.name) as scope:
             self.states_tf = tf.placeholder(dtype=tf.float32, shape=(None, *state_size), name='states')
             self.actions_tf = tf.placeholder(dtype=tf.float32, shape=(None, action_size), name='actions')
             self.advantages_tf = tf.placeholder(dtype=tf.float32, shape=(None, 1), name='advantages')
@@ -56,8 +56,9 @@ class ppo_discrete_model:
                                                             lr=self.settings["lr"],
                                                         )
             self.all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope.name)
+            self.assign_ops, assign_values = self.create_weight_setting_ops()
             self.init_ops = tf.variables_initializer(self.all_variables)
-            self.saver = tf.train.Saver(self.all_variables, self.name)
+            #self.saver = tf.train.Saver(self.all_variables, self.name)
         session.run(self.init_ops)
     def evaluate(self, states, pixels=False):
         run_list = [self.probabilities_tf,self.values_tf]
@@ -153,10 +154,29 @@ class ppo_discrete_model:
                                 )
         return x
 
+    def get_weights(self):
+        return self.session.run(self.all_variables)
+    def set_weights(self, weights):
+        feed_dict = dict(zip(self.assign_ops, weights))
+        self.session.run(self.assign_ops, feed_dict=feed_dict)
+
+    def create_weight_setting_ops(self):
+        assign_ops = []
+        assign_values = []
+        for var in self.all_variables:
+            shape, dtype = var.shape, var.dtype
+            assign_val_placeholder_tf = tf.placeholder(shape=shape, dtype=dtype)
+            assign_op_tf = var.assign(assign_val_placeholder_tf)
+            assign_ops.append(assign_op_tf)
+            assign_values.append(assign_val_placeholder_tf)
+        return assign_ops, assign_values
+
     def save(self, step):
+        return
         path = self.saver.save(self.session, "saved/"+self.name, global_step=step)
         print("Saved model at: "+path)
     def restore(self, savepoint):
+        return
         # self.saver.restore(self.session, "saved/"+self.name+"/")
         self.saver.restore(self.session, "saved/"+savepoint)
     def __call__(self,x):

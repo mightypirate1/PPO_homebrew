@@ -5,18 +5,19 @@ from model import ppo_discrete_model
 from trajectory import trajectory
 
 default_settings = {
-                    "minibatch_size" : 1024, #128
+                    "minibatch_size" : 512, #128
                     "n_train_epochs" : 3,
                     "steps_before_training" : 4096, #8k
-                    "trajectory_length" : 2048, #128
+                    "trajectory_length" : 1024, #128
                     "gamma" : 0.99,
                     "lambda" : 0.95,
                     "save_period" : 10,
                     }
 
 class ppo_discrete:
-    def __init__(self, name, session, state_size, action_size, trajectory_length=50, steps_before_update=1000, settings={}):
+    def __init__(self, name, session, state_size, action_size, model=None, settings={}, threaded=False):
         self.name = name
+        self.threaded = threaded
         self.settings = default_settings.copy()
         for x in settings: self.settings[x] = settings[x]
         self.state_size = state_size
@@ -29,7 +30,7 @@ class ppo_discrete:
                                         session,
                                         pixels=self.pixels,
                                         settings=self.settings
-                                        )
+                                        ) if model is None else model
         self.current_trajectory = trajectory(self.state_size, self.action_size)
         self.trajectories = []
         self.internal_t = 0
@@ -47,20 +48,28 @@ class ppo_discrete:
         s,a,r,s_p,d = e
         self.internal_t += 1
         self.current_trajectory.add((s,a,r,d))
-        if self.current_trajectory.get_length() >= self.settings["trajectory_length"] or e[4]:
-            self.current_trajectory.add((s_p,None,None,d), end_of_trajectory=True) #This is the system used to get an s' in for the last state too!
+        if self.current_trajectory.get_length() >= self.settings["trajectory_length"] or e[4] and not self.threaded: #If we run in threaded mode, the thread-handler will be responsible for initiating training!
+            self.end_episode(s_p,d)
+        if self.internal_t % self.settings["steps_before_training"] == 0 and not self.threaded: #If we run in threaded mode, the thread-handler will be responsible for initiating training!
+            self.end_episode(s_p,d)
+            self.do_training(self.get_train_data(), self.settings["n_train_epochs"])
+        if self.threaded:
+            return [s_p, d] #This is by convention of the threading-framework: any thing you want to recieve in the end_episode function is passed as a list by remember
+    def end_episode(self, s_prime, done):
+        if self.current_trajectory.get_length() > 0:
+            self.current_trajectory.add((s_prime, None, None, done), end_of_trajectory=True) #This is the system used to get an s' in for the last state too!
             self.trajectories.append(self.current_trajectory)
             self.current_trajectory = trajectory(self.state_size, self.action_size)
-        if self.internal_t % self.settings["steps_before_training"] == 0:
-            self.do_training()
-            self.trajectories.clear()
-
-    def do_training(self):
+    def get_train_data(self):
+        ret = self.trajectories
+        self.trajectories = []
+        return ret
+    def do_training(self, samples, epochs):
         states, actions, advantages, target_values, old_probabilities, n_samples \
-                    = self.trainsamples_from_trajectories(self.trajectories)
+                    = self.trainsamples_from_trajectories(samples)
         print("-------")
         print("training on {} samples".format(n_samples), end='',flush=True)
-        for i in range(self.settings["n_train_epochs"]):
+        for i in range(epochs):
             pi = np.random.permutation(np.arange(n_samples))
             for x in range(0,n_samples,self.settings["minibatch_size"]):
                 self.model.train(
