@@ -37,9 +37,9 @@ agents = []
 n_actors = 32
 with tf.Session() as session:
     envs = [gym.make(settings["--env"]) for _ in range(n_actors)]
+    model = None
     for i in range(n_actors):
         name = settings["--name"] + str(i)
-        model = None
         with tf.device("/cpu:0"):
             agent = ppo_discrete(
                                     name,
@@ -50,8 +50,8 @@ with tf.Session() as session:
                                     model=model,
                                     threaded=True
                                 )
+            model = agent.model
             agents.append( agent )
-        model = agent.model
     with tf.device("/device:GPU:0"):
         trainer = ppo_discrete(
                                 settings["--name"]+"_trainer",
