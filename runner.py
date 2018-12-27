@@ -39,8 +39,11 @@ with tf.Session() as session:
     envs = [gym.make(settings["--env"]) for _ in range(n_actors)]
     for i in range(n_actors):
         name = settings["--name"] + str(i)
+        model = None
         with tf.device("/cpu:0"):
-            agents.append( ppo_discrete( name, session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, threaded=True ) )
+            agent = ppo_discrete( name, session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, model=None threaded=True )
+            agents.append( agent )
+            model = agent.model
     with tf.device("/device:GPU:0"):
         trainer = ppo_discrete( settings["--name"]+"_trainer", session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, threaded=True )
     thread_runner = threaded_runner.threaded_runner(
