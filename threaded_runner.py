@@ -1,6 +1,7 @@
 import threading
 import time
 import numpy as np
+from time import time
 
 class trainer_thread(threading.Thread):
     def __init__(self,trainer, runner_threads, train_epochs):
@@ -45,6 +46,7 @@ class runner_thread(threading.Thread):
 
     def run(self, n_steps):
         self.running = True
+        t0 = time()
         '''GET THE NOW MODEL HERE'''
         s_prime = self.s_prime
         for t in range(n_steps):
@@ -57,7 +59,7 @@ class runner_thread(threading.Thread):
                 s_prime = self.env.reset()
         if not done:
             self.agent.end_episode(*args)
-        print
+        print(time()-t0)
         self.running = False
 
 class threaded_runner:

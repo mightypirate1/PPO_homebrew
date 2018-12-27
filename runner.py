@@ -69,11 +69,9 @@ with tf.Session() as session:
                                                     )
 
     for t in range( int(4096/n_actors) ):
-        t0 = time()
         print("-----iteration{}-----".format(t))
         thread_runner.run(int(4096/n_actors))
         thread_runner.join()
-        print(time() - t0)
 
 
 exit()
