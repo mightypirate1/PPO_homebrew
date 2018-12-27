@@ -4,7 +4,6 @@ import gym
 from gym import spaces
 import cv2
 
-
 class NoopResetEnv(gym.Wrapper):
     def __init__(self, env=None, noop_max=30):
         """Sample initial states by taking random number of no-ops on reset.
@@ -233,8 +232,39 @@ def wrap_atari(env):
     obs_ndim = len(env.observation_space.shape)
     if obs_ndim == 3: #Assume pixels
         """Apply a common set of wrappers for pixel-based Atari games (i.e. not the ones that work on the RAM...)."""
-        env = FrameStack(env, 4, axis=(obs_ndim-1))
         env = ProcessFrame84(env)
         env = ScaledFloatFrame(env)
+        env = FrameStack(env, 4, axis=(obs_ndim-1))
     # env = ClippedRewardsWrapper(env)
     return env
+
+class multi_env(gym.Wrapper):
+    def __init__(self, env, n=1, wrapper=None):
+        self.dummy = gym.make(env)
+        gym.Wrapper.__init__(self, self.dummy)
+        self.n = n
+        if isinstance(env, str):
+            self.env_list = [env for _ in range(n)]
+        # elif isinstance(env, list):
+        #     self.env_list = env
+        else:
+            assert False, "multi_env from environment not yet supported: create from string or list of strings instead"
+        if wrapper is None:
+            self.backend = [gym.make(e) for e in self.env_list]
+        else:
+            self.backend = [wrapper(gym.make(e)) for e in self.env_list]
+    def step(self,a):
+        ret = [[],[],[],[]]
+        for e,_a in zip(self.backend,a):
+            s_prime,reward,done,info = e.step(_a)
+            ret[0].append(s_prime)
+            ret[1].append(reward)
+            ret[2].append(done)
+            ret[3].append(info)
+        return ret
+    def reset(self):
+        return [e.reset() for e in self.backend]
+    def reset_by_idx(self,idx):
+        return self.backend[idx].reset()
+    def render(self):
+        self.backend[0].render()

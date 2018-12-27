@@ -61,18 +61,17 @@ class ppo_discrete_model:
             self.init_ops = tf.variables_initializer(self.all_variables)
             #self.saver = tf.train.Saver(self.all_variables, self.name)
         session.run(self.init_ops)
-    def evaluate(self, states, pixels=False):
+
+    def evaluate(self, states):
         run_list = [self.probabilities_tf,self.values_tf]
-        _states = states if not pixels else [s/255 for s in states]
-        feed_dict = {self.states_tf : _states}
+        feed_dict = {self.states_tf : states}
         probs, vals = self.session.run(run_list, feed_dict=feed_dict)
         return probs, vals
 
-    def train(self, states, actions, advantages, target_values, old_probabilities, pixels=False):
-        _states = states if not pixels else [s/255 for s in states]
+    def train(self, states, actions, advantages, target_values, old_probabilities):
         run_list = [self.training_ops]
         feed_dict = {
-                        self.states_tf : _states,
+                        self.states_tf : states,
                         self.actions_tf : actions,
                         self.advantages_tf : advantages,
                         self.target_values_tf : target_values,

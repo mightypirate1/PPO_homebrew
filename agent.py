@@ -5,9 +5,9 @@ from model import ppo_discrete_model
 from trajectory import trajectory
 
 default_settings = {
-                    "minibatch_size" : 512, #128
+                    "minibatch_size" : 128,
                     "n_train_epochs" : 3,
-                    "steps_before_training" : 4096, #8k
+                    "steps_before_training" : 8192,
                     "trajectory_length" : 1024, #128
                     "gamma" : 0.99,
                     "lambda" : 0.95,
@@ -15,9 +15,9 @@ default_settings = {
                     }
 
 class ppo_discrete:
-    def __init__(self, name, session, state_size, action_size, model=None, settings={}, threaded=False):
+    def __init__(self, name, session, state_size, action_size, model=None, settings={}, n_envs=1):
         self.name = name
-        self.threaded = threaded
+        self.n_envs = n_envs
         self.settings = default_settings.copy()
         for x in settings: self.settings[x] = settings[x]
         self.state_size = state_size
@@ -34,43 +34,50 @@ class ppo_discrete:
                                             )
         else:
             self.model = model
-        self.current_trajectory = trajectory(self.state_size, self.action_size)
+        self.current_trajectory = [trajectory(self.state_size, self.action_size) for _ in range(self.n_envs)]
         self.trajectories = []
         self.internal_t = 0
         self.n_trainings = 0
         self.n_saves = 0
 
     def get_action(self, s):
-        p, v = self.model.evaluate([s], pixels=self.pixels)
-        a = np.random.choice(np.arange(self.action_size), p=p[0])
-        assert not np.isinf(v[0]) and not np.isnan(v[0]), v[0]
-        assert not np.any(np.isinf(p[0])) and not np.any(np.isnan(p[0])), p[0]
-        return a
+        state_list = s if isinstance(s,list) else [s]
+        p, v = self.model.evaluate( state_list )
+        assert not np.isinf(v).any() and not np.isnan(v).any(), v
+        assert not np.isinf(p).any() and not np.isnan(p).any(), p
+        if not isinstance(s, list):
+            a = np.random.choice(np.arange(self.action_size), p=p[0])
+            return a
+        return [ np.random.choice(np.arange(self.action_size), p=p[i]) for i in range(len(s)) ]
 
     def remember(self,e):
-        s,a,r,s_p,d = e
-        self.internal_t += 1
-        self.current_trajectory.add((s,a,r,d))
-        if self.current_trajectory.get_length() >= self.settings["trajectory_length"] or e[4] and not self.threaded: #If we run in threaded mode, the thread-handler will be responsible for initiating training!
-            self.end_episode(s_p,d)
-        if self.internal_t % self.settings["steps_before_training"] == 0 and not self.threaded: #If we run in threaded mode, the thread-handler will be responsible for initiating training!
-            self.end_episode(s_p,d)
+        _s,_a,_r,_s_p,_d = e
+        self.internal_t += self.n_envs
+        for i in range(self.n_envs):
+            s,a,r,s_p,d,t = _s[i],_a[i],_r[i],_s_p[i],_d[i], self.current_trajectory[i]
+            t.add((s,a,r,d))
+            if t.get_length() >= self.settings["trajectory_length"] or d:
+                self.end_episode(_s_p, _d, indices=[i])
+        if self.internal_t > self.settings["steps_before_training"]:
+            self.end_episode(_s_p,_d)
             self.do_training(self.get_train_data(), self.settings["n_train_epochs"])
-        if self.threaded:
-            return [s_p, d] #This is by convention of the threading-framework: any thing you want to recieve in the end_episode function is passed as a list by remember
-    def end_episode(self, s_prime, done):
-        if self.current_trajectory.get_length() > 0:
-            self.current_trajectory.add((s_prime, None, None, done), end_of_trajectory=True) #This is the system used to get an s' in for the last state too!
-            self.trajectories.append(self.current_trajectory)
-            self.current_trajectory = trajectory(self.state_size, self.action_size)
+            self.internal_t -= self.settings["steps_before_training"]
+
+    def end_episode(self, s_prime, done, indices=None):
+        if indices is None: indices = [i for i in range(self.n_envs)]
+        for i,idx in enumerate(indices):
+            if self.current_trajectory[idx].get_length() > 0:
+                self.current_trajectory[idx].end_episode(s_prime[i], done[i])
+                self.trajectories.append(self.current_trajectory[idx])
+                self.current_trajectory[idx] = trajectory(self.state_size, self.action_size)
     def get_train_data(self):
         ret = self.trajectories
         self.trajectories = []
         return ret
     def do_training(self, samples, epochs):
+        print("-------")
         states, actions, advantages, target_values, old_probabilities, n_samples \
                     = self.trainsamples_from_trajectories(samples)
-        print("-------")
         print("training on {} samples".format(n_samples), end='',flush=True)
         for i in range(epochs):
             pi = np.random.permutation(np.arange(n_samples))
@@ -81,7 +88,6 @@ class ppo_discrete:
                                     advantages[pi[x:x+self.settings["minibatch_size"]]],
                                     target_values[pi[x:x+self.settings["minibatch_size"]]],
                                     old_probabilities[pi[x:x+self.settings["minibatch_size"]]],
-                                    pixels=self.pixels
                                 )
             print(".",end='',flush=True)
         print("\n")

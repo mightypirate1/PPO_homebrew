@@ -1,5 +1,5 @@
-def settings_dict(x,y):
-    ret = {}
+def settings_dict(x,y, dict=None):
+    ret = {} if dict is None else dict
     for x,y in zip(x,y):
         ret[x] = to_number(y)
     return ret
