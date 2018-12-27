@@ -41,11 +41,26 @@ with tf.Session() as session:
         name = settings["--name"] + str(i)
         model = None
         with tf.device("/cpu:0"):
-            agent = ppo_discrete( name, session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, model=None, threaded=True )
+            agent = ppo_discrete(
+                                    name,
+                                    session,
+                                    state_size=env.observation_space.shape,
+                                    action_size=env.action_space.n,
+                                    settings=agent_settings,
+                                    model=model,
+                                    threaded=True
+                                )
             agents.append( agent )
-            model = agent.model
+        model = agent.model
     with tf.device("/device:GPU:0"):
-        trainer = ppo_discrete( settings["--name"]+"_trainer", session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, threaded=True )
+        trainer = ppo_discrete(
+                                settings["--name"]+"_trainer",
+                                session,
+                                state_size=env.observation_space.shape,
+                                action_size=env.action_space.n,
+                                settings=agent_settings,
+                                threaded=True
+                                )
     thread_runner = threaded_runner.threaded_runner(
                                                     envs=envs,
                                                     runners=agents,
