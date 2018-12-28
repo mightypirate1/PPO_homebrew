@@ -86,7 +86,7 @@ class ppo_discrete_model:
         old_probs = tf.maximum(old_probabilities_tf, e)
         #Define some intermediate tensors...
         entropy_tf = tf.reduce_sum(-tf.multiply(probs, tf.log(probs)), axis=1)
-        action_prob_tf = tf.reduce_sum(tf.multiply(actions_tf, probs), axis=1, keep_dims=True)
+        action_prob_tf = tf.reduce_sum(tf.multiply(actions_tf, probs), axis=1, keepdims=True)
         ratio_tf = tf.div( action_prob_tf , old_probs )
         ratio_clipped_tf = tf.clip_by_value(ratio_tf, 1-epsilon, 1+epsilon)
         #Define the loss tensors!
