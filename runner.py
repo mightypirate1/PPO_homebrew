@@ -16,6 +16,7 @@ Options:
     --train        Train agent.
     --test         Test agent. (Enables rendering)
     --env ENV      Use Gym-environment ENV to run in. Continuous action envs not supported! [default: CartPole-v0]
+    --n_envs N     Training uses N parallel environments to collect trajectories [default: 64].
     --steps S      Run S environment steps. [default: 1000000]
     --load AGENT   Load AGENT.
     --name N       Name the agent N. [default: ape]
@@ -51,13 +52,21 @@ else:
                      }
 
 #MAIN CODE:
-n_envs = 64 if settings["--train"] else 1
+n_envs = int(settings["--n_envs"]) if settings["--train"] else 1
 agent_settings = aux.settings_dict(settings["<opt>"],settings["<setting>"], dict=agent_settings)
-wrapper = None if not settings["--atari"] else wrappers.wrap_atari
+wrapper = wrappers.wrap_atari if settings["--atari"] else None
 env = wrappers.multi_env(settings["--env"], n=n_envs, wrapper=wrapper)
 with tf.Session() as session:
     #Init agent!
-    agent = ppo_discrete( settings["--name"], session, state_size=env.observation_space.shape, action_size=env.action_space.n, settings=agent_settings, n_envs=n_envs )
+    agent = ppo_discrete(
+                            settings["--name"],
+                            session,
+                            state_size=env.observation_space.shape,
+                            action_size=env.action_space.n,
+                            settings=agent_settings,
+                            n_envs=n_envs
+                        )
+
     if settings["--load"] is not None:
         agent.restore(settings["--load"])
     #Init variables...

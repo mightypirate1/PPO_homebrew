@@ -2,16 +2,17 @@ import tensorflow as tf
 import numpy as np
 
 default_settings = {
-                    "dense_n_hidden"      : 6,
+                    #Dense-net
+                    "dense_n_hidden"      : 3,
                     "dense_hidden_size"   : 2048,
-
-                    "conv_n_convs"        : 3,
-                    "conv_n_channels"     : [32, 32, 32],
-                    "conv_filter_size"    : [(5,5), (5,5), (5,5)],
-                    "conv_pool_after"     : [1, 2],
-                    "conv_n_dense"        : 2,
+                    #Conv-net
+                    "conv_n_convs"        : 2,
+                    "conv_n_channels"     : [64, 32],
+                    "conv_filter_size"    : [(7,7), (5,5)],
+                    "conv_pool_after"     : [0, 1],
+                    "conv_n_dense"        : 1,
                     "conv_dense_size"     : 1024,
-
+                    #Training params
                     "epsilon"             : 0.2,
                     "lr"                  : 1e-4,
                     "weight_loss_policy"  : 1.0,
@@ -60,7 +61,7 @@ class ppo_discrete_model:
             self.all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope.name)
             self.assign_ops, assign_values = self.create_weight_setting_ops()
             self.init_ops = tf.variables_initializer(self.all_variables)
-            #self.saver = tf.train.Saver(self.all_variables, self.name)
+            self.saver = tf.train.Saver(self.all_variables, self.name)
         session.run(self.init_ops)
 
     def evaluate(self, states):
@@ -176,12 +177,9 @@ class ppo_discrete_model:
         return assign_ops, assign_values
 
     def save(self, step):
-        return
         path = self.saver.save(self.session, "saved/"+self.name, global_step=step)
         print("Saved model at: "+path)
     def restore(self, savepoint):
-        return
-        # self.saver.restore(self.session, "saved/"+self.name+"/")
         self.saver.restore(self.session, "saved/"+savepoint)
     def __call__(self,x):
         return self.evaluate(x)

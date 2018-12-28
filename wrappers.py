@@ -134,7 +134,7 @@ class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
         self.observation_space = spaces.Box(low=0, high=255, shape=(84, 84, 1))
-    def _observation(self, obs):
+    def observation(self, obs):
         return ProcessFrame84.process(obs)
     @staticmethod
     def process(frame):
@@ -199,7 +199,7 @@ class FrameStack(gym.Wrapper):
         return np.concatenate(self.frames, axis=self.axis)
 
 class ScaledFloatFrame(gym.ObservationWrapper):
-    def _observation(self, obs):
+    def observation(self, obs):
         # careful! This undoes the memory optimization, use
         # with smaller replay buffers only.
         return np.array(obs).astype(np.float32) / 255.0
