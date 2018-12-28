@@ -74,10 +74,10 @@ with tf.Session() as session:
         for i,d in enumerate(done):
             if d:
                 s_prime[i] = env.reset_by_idx(i)
+                n_episodes += 1
+                alpha = 0.03
+                R = (1-alpha)*R + alpha*round_score[i]
                 if i == 0: #Print less :)
-                    n_episodes += 1
-                    alpha = 0.03
-                    R = (1-alpha)*R + alpha*round_score[i]
                     w = alpha*( 1-(1-alpha)**(n_episodes) )/(alpha)
                     print("{} :: Episode length: {}, score: {} (ExpAvg: {})".format(t*n_envs,str(t-t0[i]).rjust(5), str(round_score[i]).rjust(7), str(R/w)))
                 round_score[i], t0[i] = 0, t
