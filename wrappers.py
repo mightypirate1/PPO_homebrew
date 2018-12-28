@@ -223,7 +223,6 @@ def wrap_atari(env):
 
 class multi_env(gym.Wrapper):
     def __init__(self, env, n=1, wrapper=None):
-        self.dummy = gym.make(env)
         gym.Wrapper.__init__(self, self.dummy)
         self.n = n
         if isinstance(env, str):
@@ -233,8 +232,10 @@ class multi_env(gym.Wrapper):
         else:
             assert False, "multi_env from environment not yet supported: create from string or list of strings instead"
         if wrapper is None:
+            self.env = gym.make(env)
             self.backend = [gym.make(e) for e in self.env_list]
         else:
+            self.env = wrapper(gym.make(env))
             self.backend = [wrapper(gym.make(e)) for e in self.env_list]
     def step(self,a):
         ret = [[],[],[],[]]
