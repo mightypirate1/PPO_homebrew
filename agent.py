@@ -5,6 +5,7 @@ from model import ppo_discrete_model
 from trajectory import trajectory
 
 default_settings = {
+                    "normalize_reward" : False,
                     "minibatch_size" : 128,
                     "n_train_epochs" : 3,
                     "steps_before_training" : 8192,
@@ -17,6 +18,7 @@ default_settings = {
 class ppo_discrete:
     def __init__(self, name, session, state_size, action_size, model=None, settings={}, n_envs=1):
         self.name = name
+        self.r_mu, self.r_sigma, self._r_mu, self._r_sigma = 0,1,0,0
         self.n_envs = n_envs
         self.settings = default_settings.copy()
         for x in settings: self.settings[x] = settings[x]
@@ -55,6 +57,8 @@ class ppo_discrete:
         self.internal_t += self.n_envs
         for i in range(self.n_envs):
             s,a,r,s_p,d,t = _s[i],_a[i],_r[i],_s_p[i],_d[i], self.current_trajectory[i]
+            if self.settings["normalize_reward"]:
+                r = (r-self.r_mu)/max(self.r_sigma, 0.1)
             t.add((s,a,r,d))
             if t.get_length() >= self.settings["trajectory_length"] or d:
                 self.end_episode(_s_p, _d, indices=[i])
@@ -76,7 +80,7 @@ class ppo_discrete:
         return ret
     def do_training(self, samples, epochs):
         print("-------")
-        states, actions, advantages, target_values, old_probabilities, n_samples \
+        states, actions, rewards, advantages, target_values, old_probabilities, n_samples \
                     = self.trainsamples_from_trajectories(samples)
         print("training on {} samples".format(n_samples), end='',flush=True)
         for i in range(epochs):
@@ -91,6 +95,14 @@ class ppo_discrete:
                                 )
             print(".",end='',flush=True)
         print("\n")
+        if self.settings["normalize_reward"]:
+            alpha = 0.01
+            w = alpha*(alpha**(self.n_trainings+1)-1)/(alpha-1)
+            self._r_mu    = (1-alpha) * self._r_mu    + alpha * rewards.mean()
+            self._r_sigma = (1-alpha) * self._r_sigma + alpha * rewards.var()**0.5
+            self.r_mu = self._r_mu / w
+            self.r_sigma = self._r_sigma / w
+            print("Reward mu:{}, sigma:{}".format(str(np.round(self.r_mu,decimals=4)).ljust(7), str(np.round(self.r_sigma,decimals=4)).ljust(7)))
         if self.n_trainings % self.settings["save_period"] == 0:
             self.model.save(self.n_saves)
             self.n_saves += 1
@@ -98,7 +110,7 @@ class ppo_discrete:
         print("-------")
 
     def trainsamples_from_trajectories(self, trajectories):
-        states, actions, advantages, target_values, old_probabilities, n_samples = [], [], [], [], [], 0
+        states, actions, rewards, advantages, target_values, old_probabilities, n_samples = [], [], [], [], [], [], 0
         for t in trajectories:
             adv, targ, old_prob = t.process_trajectory(
                                                         self.model,
@@ -106,11 +118,12 @@ class ppo_discrete:
                                                         lambda_discount=self.settings["lambda"],
                                                       )
             states += t.get_states()
+            rewards += t.r
             actions += t.a_1hot
             advantages += adv
             target_values += targ
             old_probabilities += old_prob
             n_samples += t.get_length()
-        return np.array(states), np.array(actions), np.array(advantages), np.array(target_values), np.array(old_probabilities), n_samples
+        return np.array(states), np.array(actions), np.array(rewards), np.array(advantages), np.array(target_values), np.array(old_probabilities), n_samples
     def restore(self, savepoint):
         self.model.restore(savepoint)
