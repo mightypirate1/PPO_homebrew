@@ -57,8 +57,6 @@ class ppo_discrete:
         self.internal_t += self.n_envs
         for i in range(self.n_envs):
             s,a,r,s_p,d,t = _s[i],_a[i],_r[i],_s_p[i],_d[i], self.current_trajectory[i]
-            if self.settings["normalize_reward"]:
-                r = (r-self.r_mu)/max(self.r_sigma, 0.1)
             t.add((s,a,r,d))
             if t.get_length() >= self.settings["trajectory_length"] or d:
                 self.end_episode(_s_p, _d, indices=[i])
@@ -116,6 +114,8 @@ class ppo_discrete:
                                                         self.model,
                                                         gamma_discount=self.settings["gamma"],
                                                         lambda_discount=self.settings["lambda"],
+                                                        r_mu=self.r_mu if self.settings["normalize_reward"] else 0,
+                                                        r_sigma=self.r_sigma if self.settings["normalize_reward"] else 1,
                                                       )
             states += t.get_states()
             rewards += t.r
