@@ -13,7 +13,8 @@ class NoopResetEnv(gym.Wrapper):
         self.noop_max = noop_max
         self.override_num_noops = None
         assert env.unwrapped.get_action_meanings()[0] == 'NOOP'
-
+    def step(self,a):
+        return self.env.step(a)
     def reset(self):
         """ Do no-op action for a number of steps in [1, noop_max]."""
         self.env.reset()
