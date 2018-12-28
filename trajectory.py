@@ -17,7 +17,7 @@ class trajectory:
             self.length += 1
     def get_length(self):
         return self.length
-    def process_trajectory(self, model, gamma_discount=0.99, lambda_discount=0.95, r_mu,s_sigma):
+    def process_trajectory(self, model, gamma_discount=0.99, lambda_discount=0.95, r_mu=0,s_sigma=1):
         advantages     = [0 for x in range(self.length)]
         td_errors      = [0 for x in range(self.length)]
         target_values  = [0 for x in range(self.length)]
