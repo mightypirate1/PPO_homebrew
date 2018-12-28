@@ -6,9 +6,10 @@ default_settings = {
                     "dense_hidden_size"   : 2048,
 
                     "conv_n_convs"        : 3,
-                    "conv_n_channels"     : 32,
-                    "conv_filter_size"    : (5,5),
-                    "conv_n_dense"        : 3,
+                    "conv_n_channels"     : [32, 32, 32],
+                    "conv_filter_size"    : [(5,5), (5,5), (5,5)],
+                    "conv_pool_after"     : [1, 2],
+                    "conv_n_dense"        : 2,
                     "conv_dense_size"     : 1024,
 
                     "epsilon"             : 0.2,
@@ -137,13 +138,14 @@ class ppo_discrete_model:
             print("\t",self.settings["conv_n_channels"]," channel layer: ", self.settings["conv_filter_size"])
             x = tf.layers.conv2d(
                                 x,
-                                self.settings["conv_n_channels"],
-                                self.settings["conv_filter_size"],
+                                self.settings["conv_n_channels"][n],
+                                self.settings["conv_filter_size"][n],
                                 padding='same',
                                 activation=tf.nn.elu,
                                 kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(),
                                 )
-        # x = tf.layers.average_pooling2d(x, 4, 4, padding='same')
+            if n in self.settings["conv_pool_after"]:
+                x = tf.layers.average_pooling2d(x, 2, 2, padding='same')
         x = tf.layers.flatten(x)
         for n in range(self.settings["conv_n_dense"]):
             print("\t",self.settings["conv_dense_size"]," unit layer")
