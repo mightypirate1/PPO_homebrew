@@ -37,7 +37,8 @@ class FireResetEnv(gym.Wrapper):
         super(FireResetEnv, self).__init__(env)
         assert env.unwrapped.get_action_meanings()[1] == 'FIRE'
         assert len(env.unwrapped.get_action_meanings()) >= 3
-
+    def step(self,a):
+        return self.env.step(a)
     def reset(self):
         self.env.reset()
         obs, _, done, _ = self.env.step(1)
@@ -58,7 +59,6 @@ class EpisodicLifeEnv(gym.Wrapper):
         self.lives = 0
         self.was_real_done = True
         self.was_real_reset = False
-
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
         self.was_real_done = done
@@ -72,7 +72,6 @@ class EpisodicLifeEnv(gym.Wrapper):
             done = True
         self.lives = lives
         return obs, reward, done, info
-
     def reset(self):
         """Reset only when lives are exhausted.
         This way all states are still reachable even though lives are episodic,
@@ -88,7 +87,6 @@ class EpisodicLifeEnv(gym.Wrapper):
         self.lives = self.env.unwrapped.ale.lives()
         return obs
 
-
 class MaxAndSkipEnv(gym.Wrapper):
     def __init__(self, env=None, skip=4):
         """Return only every `skip`-th frame"""
@@ -96,7 +94,6 @@ class MaxAndSkipEnv(gym.Wrapper):
         # most recent raw observations (for max pooling across time steps)
         self._obs_buffer = deque(maxlen=2)
         self._skip = skip
-
     def step(self, action):
         total_reward = 0.0
         done = None
@@ -116,7 +113,6 @@ class SkipEnv(gym.Wrapper):
         # most recent raw observations (for max pooling across time steps)
         self._obs_buffer = deque(maxlen=2)
         self._skip = skip
-
     def step(self, action):
         total_reward = 0.0
         done = None
@@ -127,8 +123,6 @@ class SkipEnv(gym.Wrapper):
             if done:
                 break
         return obs, total_reward, done, info
-
-
     def reset(self):
         """Clear past frame buffer and init. to first obs. from inner env."""
         self._obs_buffer.clear()
@@ -136,15 +130,12 @@ class SkipEnv(gym.Wrapper):
         self._obs_buffer.append(obs)
         return obs
 
-
 class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
         self.observation_space = spaces.Box(low=0, high=255, shape=(84, 84, 1))
-
     def _observation(self, obs):
         return ProcessFrame84.process(obs)
-
     @staticmethod
     def process(frame):
         if frame.size == 210 * 160 * 3:
@@ -159,31 +150,26 @@ class ProcessFrame84(gym.ObservationWrapper):
         x_t = np.reshape(x_t, [84, 84, 1])
         return x_t.astype(np.uint8)
 
-
 class ClippedRewardsWrapper(gym.RewardWrapper):
     def _reward(self, reward):
         """Change all the positive rewards to 1, negative to -1 and keep zero."""
         return np.sign(reward)
 
-
-class LazyFrames(object):
-    def __init__(self, frames, axis=2):
-        """This object ensures that common frames between the observations are only stored once.
-        It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay
-        buffers.
-        This object should only be converted to numpy array before being passed to the model.
-        You'd not belive how complex the previous solution was."""
-        self._frames = frames
-        self._axis = axis
-
-    def __array__(self, dtype=None):
-        out = np.concatenate(self._frames, axis=self.axis)
-        if dtype is not None:
-            out = out.astype(dtype)
-        return out
-
-
 class FrameStack(gym.Wrapper):
+    class LazyFrames(object):
+        def __init__(self, frames, axis=2):
+            """This object ensures that common frames between the observations are only stored once.
+            It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay
+            buffers.
+            This object should only be converted to numpy array before being passed to the model.
+            You'd not belive how complex the previous solution was."""
+            self._frames = frames
+            self._axis = axis
+        def __array__(self, dtype=None):
+            out = np.concatenate(self._frames, axis=self.axis)
+            if dtype is not None:
+                out = out.astype(dtype)
+            return out
     def __init__(self, env, k, axis=None):
         """Stack k last frames.
         Returns lazy array, which is much more memory efficient.
@@ -198,23 +184,19 @@ class FrameStack(gym.Wrapper):
         shp = env.observation_space.shape
         stack_shape = tuple([s*(1 if i != axis else k) for i,s in enumerate(shp)])
         self.observation_space = spaces.Box(low=0, high=255, shape=stack_shape)
-
     def reset(self):
         ob = self.env.reset()
         for _ in range(self.k):
             self.frames.append(ob)
         return self._get_ob()
-
     def step(self, action):
         ob, reward, done, info = self.env.step(action)
         self.frames.append(ob)
         return self._get_ob(), reward, done, info
-
     def _get_ob(self):
         assert len(self.frames) == self.k
         # return LazyFrames(list(self.frames), axis=self.axis)
         return np.concatenate(self.frames, axis=self.axis)
-
 
 class ScaledFloatFrame(gym.ObservationWrapper):
     def _observation(self, obs):
