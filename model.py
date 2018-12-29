@@ -7,7 +7,7 @@ default_settings = {
                     "dense_hidden_size"     : 1024,
                     #Conv-net
                     "conv_n_convs"          : 2,
-                    "conv_n_channels"       : [32, 16],
+                    "conv_n_channels"       : [16, 8],
                     "conv_filter_size"      : [(7,7), (5,5)],
                     "conv_pool_after"       : [0, 1],
                     "conv_n_dense"          : 1,

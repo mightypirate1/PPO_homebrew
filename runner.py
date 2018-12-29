@@ -43,7 +43,7 @@ if settings["--atari"]:
                         "epsilon"                  : 0.1,
                         "lr"                       : 1e-5,
                         "weight_loss_policy"       : 1.0,
-                        "weight_loss_entropy"      : 0.05,
+                        "weight_loss_entropy"      : 0.01,
                         "weight_loss_value"        : 0.50,
                      }
 else:
