@@ -6,7 +6,6 @@ from trajectory import trajectory
 
 default_settings = {
                     "normalize_reward" : False,
-                    "minibatch_size" : 128,
                     "n_train_epochs" : 3,
                     "steps_before_training" : 8192,
                     "trajectory_length" : 1024, #128
@@ -77,22 +76,9 @@ class ppo_discrete:
         self.trajectories = []
         return ret
     def do_training(self, samples, epochs):
-        print("-------")
-        states, actions, rewards, advantages, target_values, old_probabilities, n_samples \
+        states, actions, rewards, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples \
                     = self.trainsamples_from_trajectories(samples)
-        print("training on {} samples".format(n_samples), end='',flush=True)
-        for i in range(epochs):
-            pi = np.random.permutation(np.arange(n_samples))
-            for x in range(0,n_samples,self.settings["minibatch_size"]):
-                self.model.train(
-                                    states[pi[x:x+self.settings["minibatch_size"]]],
-                                    actions[pi[x:x+self.settings["minibatch_size"]]],
-                                    advantages[pi[x:x+self.settings["minibatch_size"]]],
-                                    target_values[pi[x:x+self.settings["minibatch_size"]]],
-                                    old_probabilities[pi[x:x+self.settings["minibatch_size"]]],
-                                )
-            print(".",end='',flush=True)
-        print("\n")
+        self.model.train(states, actions, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples, epochs=epochs)
         if self.settings["normalize_reward"]:
             alpha = 0.01
             w = alpha*(alpha**(self.n_trainings+1)-1)/(alpha-1)
@@ -105,10 +91,9 @@ class ppo_discrete:
             self.model.save(self.n_saves)
             self.n_saves += 1
         self.n_trainings += 1
-        print("-------")
 
     def trainsamples_from_trajectories(self, trajectories):
-        states, actions, rewards, advantages, target_values, old_probabilities, n_samples = [], [], [], [], [], [], 0
+        states, actions, rewards, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples = [], [], [], [], [], [], [], [], 0
         for t in trajectories:
             adv, targ, old_prob = t.process_trajectory(
                                                         self.model,
@@ -119,11 +104,13 @@ class ppo_discrete:
                                                       )
             states += t.get_states()
             rewards += t.r
+            cumulative_rewards += [t.get_cumulative_reward(gamma_discount=self.settings["gamma"])]
             actions += t.a_1hot
             advantages += adv
             target_values += targ
             old_probabilities += old_prob
+            trajectory_lengths += [t.get_length()]
             n_samples += t.get_length()
-        return np.array(states), np.array(actions), np.array(rewards), np.array(advantages), np.array(target_values), np.array(old_probabilities), n_samples
+        return np.array(states), np.array(actions), np.array(rewards), np.array(cumulative_rewards), np.array(advantages), np.array(target_values), np.array(old_probabilities), np.array(trajectory_lengths), n_samples
     def restore(self, savepoint):
         self.model.restore(savepoint)

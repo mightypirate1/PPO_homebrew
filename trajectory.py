@@ -17,6 +17,9 @@ class trajectory:
             self.length += 1
     def get_length(self):
         return self.length
+    def get_cumulative_reward(self, gamma_discount=0.99):
+        return sum([x*gamma_discount**i for i,x in enumerate(self.r)])
+
     def process_trajectory(self, model, gamma_discount=0.99, lambda_discount=0.95, r_mu=0, r_sigma=1):
         advantages     = [0 for x in range(self.length)]
         td_errors      = [0 for x in range(self.length)]

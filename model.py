@@ -13,6 +13,7 @@ default_settings = {
                     "conv_n_dense"        : 1,
                     "conv_dense_size"     : 1024,
                     #Training params
+                    "minibatch_size"      : 128,
                     "epsilon"             : 0.2,
                     "lr"                  : 1e-4,
                     "weight_loss_policy"  : 1.0,
@@ -31,6 +32,7 @@ class ppo_discrete_model:
         self.saved_weights = None
         self.session = session
         self.name = name
+        self.step = 0
         with tf.variable_scope("ppo_discrete"+self.name) as scope:
             self.states_tf = tf.placeholder(dtype=tf.float32, shape=(None, *state_size), name='states')
             self.actions_tf = tf.placeholder(dtype=tf.float32, shape=(None, action_size), name='actions')
@@ -47,21 +49,23 @@ class ppo_discrete_model:
                                                                     add_value_head=True,
                                                                     pixels=pixels
                                                                     )
-            self.training_ops = self.create_training_ops(
-                                                            self.actions_tf,
-                                                            self.probabilities_tf,
-                                                            self.old_probabilities_tf,
-                                                            self.advantages_tf,
+            self.training_ops, self.loss_clip_tf, self.loss_entropy_tf, self.loss_value_tf, self.loss_tf \
+                                                = self.create_training_ops(
+                                                                            self.actions_tf,
+                                                                            self.probabilities_tf,
+                                                                            self.old_probabilities_tf,
+                                                                            self.advantages_tf,
 
-                                                            self.values_tf,
-                                                            self.target_values_tf,
-                                                            epsilon=self.settings["epsilon"],
-                                                            lr=self.settings["lr"],
-                                                        )
+                                                                            self.values_tf,
+                                                                            self.target_values_tf,
+                                                                            epsilon=self.settings["epsilon"],
+                                                                            lr=self.settings["lr"],
+                                                                            )
             self.all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope.name)
             self.assign_ops, assign_values = self.create_weight_setting_ops()
             self.init_ops = tf.variables_initializer(self.all_variables)
             self.saver = tf.train.Saver(self.all_variables, self.name)
+            self.summary_writer = tf.summary.FileWriter("summaries/"+self.name, self.session.graph)
         session.run(self.init_ops)
 
     def evaluate(self, states):
@@ -70,36 +74,62 @@ class ppo_discrete_model:
         probs, vals = self.session.run(run_list, feed_dict=feed_dict)
         return probs, vals
 
-    def train(self, states, actions, advantages, target_values, old_probabilities):
-        run_list = [self.training_ops]
-        feed_dict = {
-                        self.states_tf : states,
-                        self.actions_tf : actions,
-                        self.advantages_tf : advantages,
-                        self.target_values_tf : target_values,
-                        self.old_probabilities_tf : old_probabilities,
-                    }
-        self.session.run(run_list, feed_dict=feed_dict)
+    def train(self, states, actions, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples, epochs=1):
+        run_list = [self.training_ops, self.loss_clip_tf, self.loss_entropy_tf, self.loss_value_tf, self.loss_tf]
+        loss_clip, loss_entropy, loss_value, loss = [], [], [], []
+        print("training on {} samples".format(n_samples), end='', flush=True)
+        for i in range(epochs):
+            pi = np.random.permutation(np.arange(n_samples))
+            for x in range(0,n_samples,self.settings["minibatch_size"]):
+                feed_dict = {
+                                self.states_tf : states[pi[x:x+self.settings["minibatch_size"]]],
+                                self.actions_tf : actions[pi[x:x+self.settings["minibatch_size"]]],
+                                self.advantages_tf : advantages[pi[x:x+self.settings["minibatch_size"]]],
+                                self.target_values_tf : target_values[pi[x:x+self.settings["minibatch_size"]]],
+                                self.old_probabilities_tf : old_probabilities[pi[x:x+self.settings["minibatch_size"]]],
+                            }
+                _, loss_c, loss_e, loss_v, loss_tot = self.session.run(run_list, feed_dict=feed_dict)
+                loss_clip.append(loss_c)
+                loss_entropy.append(loss_e)
+                loss_value.append(loss_v)
+                loss.append(loss_tot)
+            print(".",end='',flush=True)
+        #Create summaries!
+        summary    = tf.Summary()
+        summary.value.add(tag="Clip_loss", simple_value=np.mean(loss_clip))
+        summary.value.add(tag="Entropy_loss", simple_value=np.mean(loss_entropy))
+        summary.value.add(tag="Value_loss", simple_value=np.mean(loss_value))
+        summary.value.add(tag="Total_loss", simple_value=np.mean(loss))
+        summary.value.add(tag="Cumulative_reward", simple_value=np.mean(cumulative_rewards))
+        summary.value.add(tag="Trajectory_length", simple_value=np.mean(trajectory_lengths))
+        summary.value.add(tag="Trajectory_length_hi", simple_value=np.max(trajectory_lengths))
+        summary.value.add(tag="Trajectory_length_lo", simple_value=np.min(trajectory_lengths))
+        self.summary_writer.add_summary(summary, self.step)
+        self.summary_writer.flush()
+        self.step += self.settings["steps_before_training"]
+        print("\n")
+        print("-------")
 
     def create_training_ops(self,actions_tf, probabilities_tf, old_probabilities_tf, advantages_tf, values_tf, target_values_tf, lr=None, epsilon=None):
-        #Fudge it up so it doesnt inf/nan...
-        e = 10**-7
-        probs = tf.maximum(probabilities_tf, e)
-        old_probs = tf.maximum(old_probabilities_tf, e)
-        #Define some intermediate tensors...
-        entropy_tf = tf.reduce_sum(-tf.multiply(probs, tf.log(probs)), axis=1)
-        action_prob_tf = tf.reduce_sum(tf.multiply(actions_tf, probs), axis=1, keepdims=True)
-        ratio_tf = tf.div( action_prob_tf , old_probs )
-        ratio_clipped_tf = tf.clip_by_value(ratio_tf, 1-epsilon, 1+epsilon)
-        #Define the loss tensors!
-        loss_clip_tf = tf.reduce_mean(tf.minimum( tf.multiply(ratio_tf,advantages_tf), tf.multiply(ratio_clipped_tf,advantages_tf) ) )
-        loss_entropy_tf = tf.reduce_mean(entropy_tf)
-        loss_value_tf = tf.losses.mean_squared_error(values_tf, target_values_tf)
-        loss_tf = - self.settings["weight_loss_policy"]  * loss_clip_tf      \
-                  - self.settings["weight_loss_entropy"] * loss_entropy_tf   \
-                  + self.settings["weight_loss_value"]   * loss_value_tf
+        with tf.variable_scope("Training_ops"):
+            #Fudge it up so it doesnt inf/nan...
+            e = 10**-7
+            probs = tf.maximum(probabilities_tf, e)
+            old_probs = tf.maximum(old_probabilities_tf, e)
+            #Define some intermediate tensors...
+            entropy_tf = tf.reduce_sum(-tf.multiply(probs, tf.log(probs)), axis=1)
+            action_prob_tf = tf.reduce_sum(tf.multiply(actions_tf, probs), axis=1, keepdims=True)
+            ratio_tf = tf.div( action_prob_tf , old_probs )
+            ratio_clipped_tf = tf.clip_by_value(ratio_tf, 1-epsilon, 1+epsilon)
+            #Define the loss tensors!
+            loss_clip_tf = tf.reduce_mean(tf.minimum( tf.multiply(ratio_tf,advantages_tf), tf.multiply(ratio_clipped_tf,advantages_tf) ) )
+            loss_entropy_tf = tf.reduce_mean(entropy_tf)
+            loss_value_tf = tf.losses.mean_squared_error(values_tf, target_values_tf)
+            loss_tf = - self.settings["weight_loss_policy"]  * loss_clip_tf      \
+                      - self.settings["weight_loss_entropy"] * loss_entropy_tf   \
+                      + self.settings["weight_loss_value"]   * loss_value_tf
         #Minimize loss!
-        return tf.train.AdamOptimizer(learning_rate=lr).minimize(loss_tf)
+        return tf.train.AdamOptimizer(learning_rate=lr).minimize(loss_tf), loss_clip_tf, loss_entropy_tf, loss_value_tf, loss_tf
 
     def create_net(self, name=None, input=None, output_size=None, output_activation=tf.nn.elu, add_value_head=False, pixels=False):
         print("model: create net")
