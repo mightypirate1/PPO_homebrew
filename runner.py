@@ -30,21 +30,21 @@ Using the --x option is developer-mode.
 settings = docopt.docopt(docoptstring)
 if settings["--atari"]:
     agent_settings = {
-                        "render_training" : False,
+                        "render_training"          : False,
                         #Agent
-                        "normalize_reward" : True,
-                        "minibatch_size" : 512, #128
-                        "n_train_epochs" : 3,
-                        "steps_before_training" : 4*8192,
-                        "trajectory_length" : 1024, #128
-                        "gamma" : 0.999,
-                        "lambda" : 0.99,
+                        "normalize_advantages"     : False,
+                        "minibatch_size"           : 512, #128
+                        "n_train_epochs"           : 3,
+                        "steps_before_training"    : 4*8192,
+                        "trajectory_length"        : 1024, #128
+                        "gamma"                    : 0.999,
+                        "lambda"                   : 0.99,
                         #Model
-                        "epsilon"             : 0.1,
-                        "lr"                  : 1e-6,
-                        "weight_loss_policy"  : 1.0,
-                        "weight_loss_entropy" : 0.05,
-                        "weight_loss_value"   : 0.50,
+                        "epsilon"                  : 0.1,
+                        "lr"                       : 1e-5,
+                        "weight_loss_policy"       : 1.0,
+                        "weight_loss_entropy"      : 0.05,
+                        "weight_loss_value"        : 0.50,
                      }
 else:
     agent_settings = {

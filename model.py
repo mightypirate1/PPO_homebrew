@@ -3,22 +3,23 @@ import numpy as np
 
 default_settings = {
                     #Dense-net
-                    "dense_n_hidden"      : 3,
-                    "dense_hidden_size"   : 2048,
+                    "dense_n_hidden"        : 3,
+                    "dense_hidden_size"     : 1024,
                     #Conv-net
-                    "conv_n_convs"        : 2,
-                    "conv_n_channels"     : [64, 32],
-                    "conv_filter_size"    : [(7,7), (5,5)],
-                    "conv_pool_after"     : [0, 1],
-                    "conv_n_dense"        : 1,
-                    "conv_dense_size"     : 1024,
+                    "conv_n_convs"          : 2,
+                    "conv_n_channels"       : [32, 16],
+                    "conv_filter_size"      : [(7,7), (5,5)],
+                    "conv_pool_after"       : [0, 1],
+                    "conv_n_dense"          : 1,
+                    "conv_dense_size"       : 1024,
                     #Training params
-                    "minibatch_size"      : 128,
-                    "epsilon"             : 0.2,
-                    "lr"                  : 1e-4,
-                    "weight_loss_policy"  : 1.0,
-                    "weight_loss_entropy" : 0.01,
-                    "weight_loss_value"   : 0.50,
+                    "minibatch_size"        : 128,
+                    "epsilon"               : 0.1,
+                    "lr"                    : 1e-4,
+                    "weight_loss_policy"    : 1.0,
+                    "weight_loss_entropy"   : 0.01,
+                    "weight_loss_value"     : 0.50,
+                    "normalize_advantages"  : False,
                     }
 
 class ppo_discrete_model:
@@ -74,7 +75,12 @@ class ppo_discrete_model:
         probs, vals = self.session.run(run_list, feed_dict=feed_dict)
         return probs, vals
 
-    def train(self, states, actions, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples, epochs=1):
+    def train(self, states, actions, cumulative_rewards, _advantages, target_values, old_probabilities, trajectory_lengths, n_samples, epochs=1):
+        if self.settings["normalize_advantages"]:
+            mu, sigma = np.mean(_advantages), np.std(_advantages)
+            advantages = (_advantages - mu) / max(sigma,0.01)
+        else:
+            advantages = _advantages
         run_list = [self.training_ops, self.loss_clip_tf, self.loss_entropy_tf, self.loss_value_tf, self.loss_tf]
         loss_clip, loss_entropy, loss_value, loss = [], [], [], []
         print("training on {} samples".format(n_samples), end='', flush=True)

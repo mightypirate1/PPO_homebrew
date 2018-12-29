@@ -5,7 +5,6 @@ from model import ppo_discrete_model
 from trajectory import trajectory
 
 default_settings = {
-                    "normalize_reward" : False,
                     "n_train_epochs" : 3,
                     "steps_before_training" : 8192,
                     "trajectory_length" : 1024, #128
@@ -79,14 +78,6 @@ class ppo_discrete:
         states, actions, rewards, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples \
                     = self.trainsamples_from_trajectories(samples)
         self.model.train(states, actions, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples, epochs=epochs)
-        if self.settings["normalize_reward"]:
-            alpha = 0.01
-            w = alpha*(alpha**(self.n_trainings+1)-1)/(alpha-1)
-            self._r_mu    = (1-alpha) * self._r_mu    + alpha * rewards.mean()
-            self._r_sigma = (1-alpha) * self._r_sigma + alpha * rewards.var()**0.5
-            self.r_mu = self._r_mu / w
-            self.r_sigma = self._r_sigma / w
-            print("Reward mu:{}, sigma:{}".format(str(np.round(self.r_mu,decimals=4)).ljust(7), str(np.round(self.r_sigma,decimals=4)).ljust(7)))
         if self.n_trainings % self.settings["save_period"] == 0:
             self.model.save(self.n_saves)
             self.n_saves += 1
