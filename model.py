@@ -78,15 +78,20 @@ class ppo_discrete_model:
     def train(self, states, actions, cumulative_rewards, _advantages, target_values, old_probabilities, trajectory_lengths, n_samples, epochs=1):
         if self.settings["normalize_advantages"]:
             mu, sigma = np.mean(_advantages), np.std(_advantages)
-            advantages = (_advantages - mu) / max(sigma,0.01)
+            advantages = (_advantages - mu) / max(sigma,0.01) + mu
+            print("Advantage normalization: mu={}, sigma={}".format(mu,sigma))
         else:
             advantages = _advantages
         run_list = [self.training_ops, self.loss_clip_tf, self.loss_entropy_tf, self.loss_value_tf, self.loss_tf]
         loss_clip, loss_entropy, loss_value, loss = [], [], [], []
-        print("training on {} samples".format(n_samples), end='', flush=True)
+
         for i in range(epochs):
+            print("[",end='', flush=False); progress = 0
             pi = np.random.permutation(np.arange(n_samples))
             for x in range(0,n_samples,self.settings["minibatch_size"]):
+                if x/n_samples > progress:
+                    print("=",end='',flush=True)
+                    progress += 0.05
                 feed_dict = {
                                 self.states_tf : states[pi[x:x+self.settings["minibatch_size"]]],
                                 self.actions_tf : actions[pi[x:x+self.settings["minibatch_size"]]],
@@ -99,7 +104,7 @@ class ppo_discrete_model:
                 loss_entropy.append(loss_e)
                 loss_value.append(loss_v)
                 loss.append(loss_tot)
-            print(".",end='',flush=True)
+            print("]",flush=True)
         #Create summaries!
         summary    = tf.Summary()
         summary.value.add(tag="Clip_loss", simple_value=np.mean(loss_clip))
@@ -113,8 +118,6 @@ class ppo_discrete_model:
         self.summary_writer.add_summary(summary, self.step)
         self.summary_writer.flush()
         self.step += self.settings["steps_before_training"]
-        print("\n")
-        print("-------")
 
     def create_training_ops(self,actions_tf, probabilities_tf, old_probabilities_tf, advantages_tf, values_tf, target_values_tf, lr=None, epsilon=None):
         with tf.variable_scope("Training_ops"):

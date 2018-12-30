@@ -3,6 +3,7 @@ import numpy as np
 import model
 from model import ppo_discrete_model
 from trajectory import trajectory
+import time
 
 default_settings = {
                     "n_train_epochs" : 3,
@@ -39,6 +40,7 @@ class ppo_discrete:
         self.internal_t = 0
         self.n_trainings = 0
         self.n_saves = 0
+        self.time_start = time.time()
 
     def get_action(self, s):
         state_list = s if isinstance(s,list) else [s]
@@ -77,12 +79,14 @@ class ppo_discrete:
     def do_training(self, samples, epochs):
         states, actions, rewards, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples \
                     = self.trainsamples_from_trajectories(samples)
+        print("training on {} samples (gathered in {} seconds)".format(n_samples, time.time()-self.time_start))
         self.model.train(states, actions, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples, epochs=epochs)
         if self.n_trainings % self.settings["save_period"] == 0:
             self.model.save(self.n_saves)
             self.n_saves += 1
         self.n_trainings += 1
-
+        self.time_start = time.time()
+        print("-------")
     def trainsamples_from_trajectories(self, trajectories):
         states, actions, rewards, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples = [], [], [], [], [], [], [], [], 0
         for t in trajectories:
@@ -90,8 +94,6 @@ class ppo_discrete:
                                                         self.model,
                                                         gamma_discount=self.settings["gamma"],
                                                         lambda_discount=self.settings["lambda"],
-                                                        r_mu=self.r_mu if self.settings["normalize_reward"] else 0,
-                                                        r_sigma=self.r_sigma if self.settings["normalize_reward"] else 1,
                                                       )
             states += t.get_states()
             rewards += t.r
