@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+from aux.parameters import *
 
 default_settings = {
                     #Dense-net
@@ -34,12 +35,17 @@ class ppo_discrete_model:
         self.session = session
         self.name = name
         self.step = 0
-        with tf.variable_scope("ppo_discrete"+self.name) as scope:
-            self.states_tf = tf.placeholder(dtype=tf.float32, shape=(None, *state_size), name='states')
-            self.actions_tf = tf.placeholder(dtype=tf.float32, shape=(None, action_size), name='actions')
-            self.advantages_tf = tf.placeholder(dtype=tf.float32, shape=(None, 1), name='advantages')
-            self.target_values_tf = tf.placeholder(dtype=tf.float32, shape=(None, 1), name='target_values')
+        with tf.variable_scope("ppo_discrete_"+self.name) as scope:
+            #Input tensors
+            self.states_tf            = tf.placeholder(dtype=tf.float32, shape=(None, *state_size), name='states')
+            self.actions_tf           = tf.placeholder(dtype=tf.float32, shape=(None, action_size), name='actions')
+            self.advantages_tf        = tf.placeholder(dtype=tf.float32, shape=(None, 1), name='advantages')
+            self.target_values_tf     = tf.placeholder(dtype=tf.float32, shape=(None, 1), name='target_values')
             self.old_probabilities_tf = tf.placeholder(dtype=tf.float32, shape=(None, 1), name='old_probs')
+            #Parameter tensors
+            self.lr_tf      = tf.placeholder(dtype=tf.float32, shape=(), name='lr')
+            self.epsilon_tf = tf.placeholder(dtype=tf.float32, shape=(), name='epsilon')
+            #Network
             # self.probabilities_tf = self.create_net(name='policy_net', input=self.states_tf, output_size=action_size, output_activation=tf.nn.softmax)
             # self.values_tf        = self.create_net(name='value_net',  input=self.states_tf, output_size=1,           output_activation=None)
             self.probabilities_tf, self.values_tf = self.create_net(
@@ -93,11 +99,15 @@ class ppo_discrete_model:
                     print("=",end='',flush=True)
                     progress += 0.05
                 feed_dict = {
+                                #Inputs
                                 self.states_tf : states[pi[x:x+self.settings["minibatch_size"]]],
                                 self.actions_tf : actions[pi[x:x+self.settings["minibatch_size"]]],
                                 self.advantages_tf : advantages[pi[x:x+self.settings["minibatch_size"]]],
                                 self.target_values_tf : target_values[pi[x:x+self.settings["minibatch_size"]]],
                                 self.old_probabilities_tf : old_probabilities[pi[x:x+self.settings["minibatch_size"]]],
+                                #Parameters
+                                self.lr_tf : self.settings["lr"] if not isinstance(self.settings["lr"], parameter) else self.settings["lr"].get_value(self.step),
+                                self.epsilon_tf : self.settings["epsilon"] if not isinstance(self.settings["epsilon"], parameter) else self.settings["epsilon"].get_value(self.step),
                             }
                 _, loss_c, loss_e, loss_v, loss_tot = self.session.run(run_list, feed_dict=feed_dict)
                 loss_clip.append(loss_c)
@@ -129,7 +139,7 @@ class ppo_discrete_model:
             entropy_tf = tf.reduce_sum(-tf.multiply(probs, tf.log(probs)), axis=1)
             action_prob_tf = tf.reduce_sum(tf.multiply(actions_tf, probs), axis=1, keepdims=True)
             ratio_tf = tf.div( action_prob_tf , old_probs )
-            ratio_clipped_tf = tf.clip_by_value(ratio_tf, 1-epsilon, 1+epsilon)
+            ratio_clipped_tf = tf.clip_by_value(ratio_tf, 1-self.epsilon_tf, 1+self.epsilon_tf)
             #Define the loss tensors!
             loss_clip_tf = tf.reduce_mean(tf.minimum( tf.multiply(ratio_tf,advantages_tf), tf.multiply(ratio_clipped_tf,advantages_tf) ) )
             loss_entropy_tf = tf.reduce_mean(entropy_tf)
@@ -138,7 +148,7 @@ class ppo_discrete_model:
                       - self.settings["weight_loss_entropy"] * loss_entropy_tf   \
                       + self.settings["weight_loss_value"]   * loss_value_tf
         #Minimize loss!
-        return tf.train.AdamOptimizer(learning_rate=lr).minimize(loss_tf), loss_clip_tf, loss_entropy_tf, loss_value_tf, loss_tf
+        return tf.train.AdamOptimizer(learning_rate=self.lr_tf).minimize(loss_tf), loss_clip_tf, loss_entropy_tf, loss_value_tf, loss_tf
 
     def create_net(self, name=None, input=None, output_size=None, output_activation=tf.nn.elu, add_value_head=False, pixels=False):
         print("model: create net")
@@ -151,12 +161,16 @@ class ppo_discrete_model:
                                 hidden,
                                 output_size,
                                 activation=output_activation,
+                                kernel_initializer=tf.initializers.zeros,
+                                bias_initializer=tf.initializers.zeros,
                                 )
             if add_value_head:
                 val = tf.layers.dense(
                                     hidden,
                                     1,
                                     activation=None,
+                                    kernel_initializer=tf.initializers.zeros,
+                                    bias_initializer=tf.initializers.zeros,
                                     )
                 return ret, val
             return ret

@@ -1,11 +1,12 @@
 import gym
 import docopt
 from agent import ppo_discrete
-import aux
 import wrappers
 import tensorflow as tf
 import numpy as np
 from time import time
+from aux.parameters import *
+from aux import aux
 
 docoptstring = '''PPO_homebrew!
 Usage:
@@ -19,7 +20,7 @@ Options:
     --n_envs N     Training uses N parallel environments to collect trajectories [default: 64].
     --steps S      Run S environment steps. [default: 1000000]
     --load AGENT   Load AGENT.
-    --name N       Name the agent N. [default: ape]
+    --name N       Name the agent N. [default: no-id]
     --atari        Applies a set of wrappers for Atari-environments.
     --verbose      More print statements!
     --help         Print this message.
@@ -30,21 +31,23 @@ Using the --x option is developer-mode.
 settings = docopt.docopt(docoptstring)
 if settings["--atari"]:
     agent_settings = {
+                        #Runner
                         "render_training"          : False,
                         #Agent
+                        "evals_on_cpu"             : False,
                         "normalize_advantages"     : False,
-                        "minibatch_size"           : 512, #128
+                        "minibatch_size"           : 256, #128
                         "n_train_epochs"           : 3,
                         "steps_before_training"    : 4*8192,
-                        "trajectory_length"        : 1024, #128
-                        "gamma"                    : 0.999,
-                        "lambda"                   : 0.99,
+                        "trajectory_length"        : 2048, #128
+                        "gamma"                    : 0.99,
+                        "lambda"                   : 0.95,
                         #Model
-                        "epsilon"                  : 0.1,
-                        "lr"                       : 1e-5,
+                        "epsilon"                  : linear_parameter(0.1   , final_val=0, time_horizon=1e7), #0.1,
+                        "lr"                       : linear_parameter(2.5e-4, final_val=0, time_horizon=1e7), #1e-4,
                         "weight_loss_policy"       : 1.0,
                         "weight_loss_entropy"      : 0.01,
-                        "weight_loss_value"        : 0.50,
+                        "weight_loss_value"        : 1.00,
                      }
 else:
     agent_settings = {
@@ -84,7 +87,7 @@ with tf.Session() as session:
             if d:
                 s_prime[i] = env.reset_by_idx(i)
                 n_episodes += 1
-                alpha = 0.03
+                alpha = 0.01
                 R = (1-alpha)*R + alpha*round_score[i]
                 if i == 0: #Print less :)
                     w = alpha*( 1-(1-alpha)**(n_episodes) )/(alpha)

@@ -6,6 +6,7 @@ from trajectory import trajectory
 import time
 
 default_settings = {
+                    "evals_on_cpu" : False,
                     "n_train_epochs" : 3,
                     "steps_before_training" : 8192,
                     "trajectory_length" : 1024, #128
@@ -33,7 +34,19 @@ class ppo_discrete:
                                             pixels=self.pixels,
                                             settings=self.settings
                                             )
+            if self.settings["evals_on_cpu"]:
+                print("eval models")
+                with tf.device("/cpu:0"):
+                    self.eval_model = self.model = ppo_discrete_model(
+                                                    self.name+"_eval",
+                                                    self.state_size,
+                                                    self.action_size,
+                                                    session,
+                                                    pixels=self.pixels,
+                                                    settings=self.settings
+                                                    )
         else:
+            assert not self.settings["evals_on_cpu"], "agent crateion from existing model not supported yet for cpu-evals"
             self.model = model
         self.current_trajectory = [trajectory(self.state_size, self.action_size) for _ in range(self.n_envs)]
         self.trajectories = []
@@ -44,7 +57,7 @@ class ppo_discrete:
 
     def get_action(self, s):
         state_list = s if isinstance(s,list) else [s]
-        p, v = self.model.evaluate( state_list )
+        p, v = self.model.evaluate( state_list ) if not self.settings["evals_on_cpu"] else self.eval_model.evaluate( state_list )
         assert not np.isinf(v).any() and not np.isnan(v).any(), v
         assert not np.isinf(p).any() and not np.isnan(p).any(), p
         if not isinstance(s, list):
@@ -77,6 +90,9 @@ class ppo_discrete:
         self.trajectories = []
         return ret
     def do_training(self, samples, epochs):
+        if self.settings["evals_on_cpu"]:
+            print("swapping models")
+            self.model.set_weights(self.eval_model.get_weights())
         states, actions, rewards, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples \
                     = self.trainsamples_from_trajectories(samples)
         print("training on {} samples (gathered in {} seconds)".format(n_samples, time.time()-self.time_start))
@@ -86,6 +102,9 @@ class ppo_discrete:
             self.n_saves += 1
         self.n_trainings += 1
         self.time_start = time.time()
+        if self.settings["evals_on_cpu"]:
+            print("swapping models")
+            self.eval_model.set_weights(self.model.get_weights())
         print("-------")
     def trainsamples_from_trajectories(self, trajectories):
         states, actions, rewards, cumulative_rewards, advantages, target_values, old_probabilities, trajectory_lengths, n_samples = [], [], [], [], [], [], [], [], 0
