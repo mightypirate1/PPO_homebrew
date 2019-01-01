@@ -8,7 +8,7 @@ import time
 default_settings = {
                     "evals_on_cpu" : False,
                     "n_train_epochs" : 3,
-                    "steps_before_training" : 8192,
+                    "steps_before_training" : 4*8192,
                     "trajectory_length" : 1024, #128
                     "gamma" : 0.99,
                     "lambda" : 0.95,
@@ -64,6 +64,7 @@ class ppo_discrete:
             a = np.random.choice(np.arange(self.action_size), p=p[0])
             return a
         return [ np.random.choice(np.arange(self.action_size), p=p[i]) for i in range(len(s)) ]
+        # return [ np.argmax(p[i]) for i in range(len(s)) ]
 
     def remember(self,e):
         _s,_a,_r,_s_p,_d = e

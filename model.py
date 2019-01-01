@@ -5,7 +5,7 @@ from aux.parameters import *
 default_settings = {
                     #Dense-net
                     "dense_n_hidden"        : 3,
-                    "dense_hidden_size"     : 1024,
+                    "dense_hidden_size"     : 2048,
                     #Conv-net
                     "conv_n_convs"          : 2,
                     "conv_n_channels"       : [16, 8],
@@ -14,12 +14,12 @@ default_settings = {
                     "conv_n_dense"          : 1,
                     "conv_dense_size"       : 1024,
                     #Training params
-                    "minibatch_size"        : 128,
-                    "epsilon"               : 0.1,
-                    "lr"                    : 1e-4,
+                    "minibatch_size"        : 256,
+                    "epsilon"               : linear_parameter(0.1   , final_val=0, time_horizon=1e7), #0.1,
+                    "lr"                    : linear_parameter(1e-5, final_val=0, time_horizon=1e7), #1e-4,
                     "weight_loss_policy"    : 1.0,
-                    "weight_loss_entropy"   : 0.01,
-                    "weight_loss_value"     : 0.50,
+                    "weight_loss_entropy"   : 0.05,
+                    "weight_loss_value"     : 1.0,
                     "normalize_advantages"  : False,
                     }
 

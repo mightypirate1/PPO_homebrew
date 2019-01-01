@@ -8,7 +8,8 @@ from time import time
 from aux.parameters import *
 from aux import aux
 
-docoptstring = '''PPO_homebrew!
+docoptstring = \
+'''PPO_homebrew!
 Usage:
   runner.py (--train | --test | --help) [options]
   runner.py (--train | --test | --help) [options] --x (<opt> <setting>)...
@@ -27,8 +28,9 @@ Options:
 
 Using the --x option is developer-mode.
 '''
+settings = docopt.docopt(docoptstring) #Handle args...
 
-settings = docopt.docopt(docoptstring)
+#We keep some separate hyper-parameters for the Atari-stuff, out of convenience :)
 if settings["--atari"]:
     agent_settings = {
                         #Runner
@@ -49,7 +51,7 @@ if settings["--atari"]:
                         "weight_loss_entropy"      : 0.01,
                         "weight_loss_value"        : 1.00,
                      }
-else:
+else: #Options not set in this dict will use default values specified in each class
     agent_settings = {
                         "render_training" : False,
                      }
@@ -57,8 +59,9 @@ else:
 #MAIN CODE:
 n_envs = int(settings["--n_envs"]) if settings["--train"] else 1
 agent_settings = aux.settings_dict(settings["<opt>"],settings["<setting>"], dict=agent_settings)
-wrapper = wrappers.wrap_atari if settings["--atari"] else None
-env = wrappers.multi_env(settings["--env"], n=n_envs, wrapper=wrapper)
+wrapper = wrappers.wrap_atari if settings["--atari"] else None #Wrap the Atari-envs like the big boys do!
+env = wrappers.multi_env(settings["--env"], n=n_envs, wrapper=wrapper) #Class for keeping a bunch of environments. It implements vector-versions of the relevant functions...
+
 with tf.Session() as session:
     #Init agent!
     agent = ppo_discrete(
@@ -69,11 +72,14 @@ with tf.Session() as session:
                             settings=agent_settings,
                             n_envs=n_envs
                         )
-
+    #Optionally, we can restore an agent.
     if settings["--load"] is not None:
         agent.restore(settings["--load"])
+
     #Init variables...
     s_prime, n_episodes, round_score,t0, R = env.reset(), 0, np.zeros(n_envs), -np.ones(n_envs), 0
+
+    #Train!
     for t in range(int(settings["--steps"])):
         s = s_prime
         a = agent.get_action(s)
@@ -84,12 +90,14 @@ with tf.Session() as session:
         if settings["--train"]:
             agent.remember((s,a,r,s_prime,done))
         for i,d in enumerate(done):
-            if d:
-                s_prime[i] = env.reset_by_idx(i)
+            if d: #If some env reached a terminal state:
+                #We keep track of an exponentially running average of the episode-returns...
                 n_episodes += 1
                 alpha = 0.01
                 R = (1-alpha)*R + alpha*round_score[i]
-                if i == 0: #Print less :)
-                    w = alpha*( 1-(1-alpha)**(n_episodes) )/(alpha)
+                if i == 0: #...and for one special env, we print  some stats, and the running average.
+                    w = (1-(1-alpha)**n_episodes)
                     print("{} :: Episode length: {}, score: {} (ExpAvg: {})".format(t*n_envs,str(t-t0[i]).rjust(5), str(round_score[i]).rjust(7), str(R/w)))
+                #Don't forget to also reset it!
+                s_prime[i] = env.reset_by_idx(i)
                 round_score[i], t0[i] = 0, t

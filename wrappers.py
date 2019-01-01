@@ -204,6 +204,10 @@ class ScaledFloatFrame(gym.ObservationWrapper):
         # with smaller replay buffers only.
         return np.array(obs).astype(np.float32) / 255.0
 
+#####
+#####
+#####
+
 def wrap_atari(env):
     """Apply a common set of wrappers for Atari games."""
     # assert 'NoFrameskip' in env.spec.id
@@ -220,6 +224,10 @@ def wrap_atari(env):
         env = FrameStack(env, 4, axis=(obs_ndim-1))
     # env = ClippedRewardsWrapper(env)
     return env
+
+#####
+#####
+#####
 
 class multi_env(gym.Wrapper):
     def __init__(self, env, n=1, wrapper=None):
