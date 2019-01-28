@@ -27,14 +27,13 @@ class trajectory:
         p,v = model(self.s)
         for i in range(self.length):
             td_errors[i] = -v[i] + self.r[i] + gamma_discount*v[i+1]*int(not self.d[i])
-        for i in range(self.length):
-            for j in range(i, self.length):
-                advantages[i] += lambda_discount**(j-i) * td_errors[j]
+
+        adv = 0
+        for i, td in reversed(list(enumerate(td_errors))):
+            adv += lambda_discount * td
+                advantages[i] = adv
         #ADNANTAGE METHOD
         target_values = [x+y for x,y in zip(v.tolist(),advantages)]
-        #OTHER METHOD
-        # for i in range(self.length):
-        #     target_values[i] = self.r[i] + gamma_discount * v[i+1]
         old_probabilities = [[p[i,a]] for i,a in enumerate(self.a)]
         return advantages, target_values, old_probabilities
     def end_episode(self,sp,d):

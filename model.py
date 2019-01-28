@@ -129,7 +129,7 @@ class ppo_discrete_model:
         self.summary_writer.flush()
         self.step += self.settings["steps_before_training"]
 
-    def create_training_ops(self,actions_tf, probabilities_tf, old_probabilities_tf, advantages_tf, values_tf, target_values_tf, lr=None, epsilon=None):
+    def create_training_ops(self,actions_tf, probabilities_tf, old_probabilities_tf, advantages_tf, values_tf, target_values_tf, epsilon=None):
         with tf.variable_scope("Training_ops"):
             #Fudge it up so it doesnt inf/nan...
             e = 10**-7
@@ -189,7 +189,7 @@ class ppo_discrete_model:
         x = input_tensor
         print("model: create conv")
         for n in range(self.settings["conv_n_convs"]):
-            print("\t",self.settings["conv_n_channels"]," channel layer: ", self.settings["conv_filter_size"])
+            print("\t",self.settings["conv_n_channels"][n]," channel layer: ", self.settings["conv_filter_size"][n])
             x = tf.layers.conv2d(
                                 x,
                                 self.settings["conv_n_channels"][n],
