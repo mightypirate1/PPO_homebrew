@@ -31,7 +31,7 @@ class trajectory:
         adv = 0
         for i, td in reversed(list(enumerate(td_errors))):
             adv += lambda_discount * td
-                advantages[i] = adv
+            advantages[i] = adv
         #ADNANTAGE METHOD
         target_values = [x+y for x,y in zip(v.tolist(),advantages)]
         old_probabilities = [[p[i,a]] for i,a in enumerate(self.a)]
