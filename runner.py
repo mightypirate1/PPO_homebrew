@@ -41,7 +41,7 @@ if settings["--atari"]:
                         "minibatch_size"           : 256, #128
                         "n_train_epochs"           : 3,
                         "steps_before_training"    : 4*8192,
-                        "trajectory_length"        : 2048, #128
+                        "trajectory_length"        : 128,
                         "gamma"                    : 0.99,
                         "lambda"                   : 0.95,
                         #Model
