@@ -15,3 +15,13 @@ To train an agent on environment E for S steps and save as X:
 python3 runner.py --train --env E --steps S --name X
 ```
 > If the environment E is an Atari environment, you might also add "--atari" to the command line to get the hyperparameters for that experiment from the original paper. An arsenal of wrappers is optionally applied "DeepMind-style". To control which, find the class "wrap_atari" in wrappers.py and uncomment the ones you like.
+
+## Test:
+To test an agent saved as X on environment E for S steps:
+```
+python3 runner.py --test --env E --steps S --name X
+```
+> If the environment E is an Atari environment and you used the "--atari" flag for training, you should also use it here! Make sure the wrappers enabled are the same as for training (else your results are probably gonna be worse, or there will be errors).
+
+## Comments, questions or corrections?
+In case of any of the above, drop me a line on yfflan at gmail dot com :-)
