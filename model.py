@@ -66,7 +66,6 @@ class ppo_discrete_model:
                                                                             self.values_tf,
                                                                             self.target_values_tf,
                                                                             epsilon=self.settings["epsilon"],
-                                                                            lr=self.settings["lr"],
                                                                             )
             self.all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope.name)
             self.assign_ops, assign_values = self.create_weight_setting_ops()
